@@ -1,5 +1,8 @@
 # Device Health Monitor (DHM)
 
+![GitHub License](https://img.shields.io/github/license/APOLL0PL/device-health-monitor)
+![GitHub top language](https://img.shields.io/github/languages/top/APOLL0PL/device-health-monitor)
+
 > **English** | [Polski](README.pl.md)
 
 Dashboard + agents for monitoring device health on your network: CPU, RAM, disk, temperature, uptime, network (↓/↑).
