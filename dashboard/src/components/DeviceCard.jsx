@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Monitor, Terminal, Smartphone, Server, ThermometerSun, Pencil, Check, X, ArrowDown, ArrowUp } from 'lucide-react';
 
-const API = window.location.port === '5173' ? 'http://192.168.0.10:4000' : '';
+const API = '';
 const TOKEN = window.DHM_CONFIG?.token;
 
 function timeAgo(dateStr) {

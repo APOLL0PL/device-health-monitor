@@ -4,7 +4,7 @@ import DeviceCard from './components/DeviceCard';
 import DeviceDetail from './components/DeviceDetail';
 import AlertsPanel from './components/AlertsPanel';
 
-const API = window.location.port === '5173' ? 'http://192.168.0.10:4000' : '';
+const API = '';
 const TOKEN = window.DHM_CONFIG?.token;
 
 async function api(path) {
@@ -129,7 +129,7 @@ export default function App() {
             <div className="empty-state">
               <p>Brak urzadzen.</p>
               <p>Uruchom agenta na urzadzeniu:</p>
-              <code>SERVER_URL=http://192.168.0.10:4000 DEVICE_NAME="My Laptop" node agent/index.js</code>
+              <code>SERVER_URL=http://&lt;server-IP&gt;:4000 DEVICE_NAME="My Laptop" node agent/index.js</code>
             </div>
           )}
           {devices.map((d) => (
