@@ -1,0 +1,114 @@
+import { useState, useEffect } from 'react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { Clock } from 'lucide-react';
+
+export default function DeviceDetail({ deviceId, api }) {
+  const [device, setDevice] = useState(null);
+  const [metrics, setMetrics] = useState([]);
+  const [hours, setHours] = useState(24);
+
+  useEffect(() => {
+    api(`/api/devices/${deviceId}`).then(d => setDevice(d.device));
+  }, [deviceId]);
+
+  useEffect(() => {
+    api(`/api/devices/${deviceId}/metrics?hours=${hours}`).then(d => {
+      const rows = d.metrics || [];
+      const data = rows.map((m, i) => {
+        const prev = rows[i - 1];
+        let net_in_rate = null;
+        let net_out_rate = null;
+        if (prev) {
+          const dt = (new Date(m.timestamp + 'Z').getTime() - new Date(prev.timestamp + 'Z').getTime()) / 1000;
+          if (dt > 0) {
+            net_in_rate = (m.net_in_bytes - prev.net_in_bytes) / dt;
+            net_out_rate = (m.net_out_bytes - prev.net_out_bytes) / dt;
+          }
+        }
+        return {
+          ...m,
+          time: new Date(m.timestamp + 'Z').toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }),
+          ram_pct: m.ram_total_mb > 0 ? Math.round((m.ram_used_mb / m.ram_total_mb) * 100) : 0,
+          disk_pct: m.disk_total_gb > 0 ? Math.round((m.disk_used_gb / m.disk_total_gb) * 100) : 0,
+          net_in_rate,
+          net_out_rate,
+        };
+      });
+      setMetrics(data);
+    });
+  }, [deviceId, hours]);
+
+  if (!device) return <div className="loading">Ladowanie...</div>;
+
+  return (
+    <div className="device-detail">
+      <div className="detail-header">
+        <h2>{device.name}</h2>
+        <span className="device-ip">{device.ip} · {device.type}</span>
+        <div className="time-selector">
+          {[1, 6, 24, 72, 168].map(h => (
+            <button key={h} className={hours === h ? 'active' : ''} onClick={() => setHours(h)}>
+              <Clock size={12} /> {h < 24 ? `${h}h` : `${h / 24}d`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {metrics.length === 0 ? (
+        <div className="empty-state">Brak danych — poczekaj na raport agenta</div>
+      ) : (
+        <div className="charts-grid">
+          <ChartCard title="CPU %" data={metrics} dataKey="cpu_percent" color="#f97316" max={100} unit="%" />
+          <ChartCard title="RAM %" data={metrics} dataKey="ram_pct" color="#3b82f6" max={100} unit="%" />
+          <ChartCard title="Dysk %" data={metrics} dataKey="disk_pct" color="#a855f7" max={100} unit="%" />
+          <ChartCard title="Temperatura" data={metrics} dataKey="temperature_c" color="#ef4444" unit="°C" />
+          <ChartCard title="RAM" data={metrics} dataKey="ram_used_mb" color="#3b82f6" unitMb />
+          <ChartCard title="Internet ↓" data={metrics} dataKey="net_in_rate" color="#22c55e" rateBytes />
+          <ChartCard title="Internet ↑" data={metrics} dataKey="net_out_rate" color="#eab308" rateBytes />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChartCard({ title, data, dataKey, color, max, unit, formatBytes, rateBytes, unitMb }) {
+  const formatValue = (v) => {
+    if (v == null) return '—';
+    if (rateBytes) {
+      if (v > 1048576) return `${(v / 1048576).toFixed(2)} MB/s`;
+      if (v > 1024) return `${(v / 1024).toFixed(1)} KB/s`;
+      return `${v.toFixed(1)} B/s`;
+    }
+    if (unitMb) {
+      if (v > 10240) return `${(v / 1024).toFixed(1)} GB`;
+      return `${Math.round(v)} MB`;
+    }
+    if (formatBytes) {
+      if (v > 1073741824) return `${(v / 1073741824).toFixed(1)} GB`;
+      if (v > 1048576) return `${(v / 1048576).toFixed(1)} MB`;
+      if (v > 1024) return `${(v / 1024).toFixed(1)} KB`;
+      return `${v} B`;
+    }
+    return `${v}${unit || ''}`;
+  };
+
+  return (
+    <div className="chart-card">
+      <h3>{title}</h3>
+      <ResponsiveContainer width="100%" height={180}>
+        <AreaChart data={data}>
+          <defs>
+            <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <XAxis dataKey="time" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+          <YAxis domain={max ? [0, max] : undefined} tick={{ fontSize: 10 }} width={40} />
+          <Tooltip formatter={(v) => formatValue(v)} labelStyle={{ color: '#888' }} />
+          <Area type="monotone" dataKey={dataKey} stroke={color} fill={`url(#grad-${dataKey})`} dot={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

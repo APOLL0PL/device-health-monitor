@@ -1,0 +1,29 @@
+# Zależności
+node_modules/
+
+# Sekrety i konfiguracja lokalna
+agent/.api_key
+server/.env
+dashboard/dist/config.js
+
+# Tokeny i klucze (na wszelki wypadek)
+*token*
+*.key
+server-key.txt
+dhm-token.txt
+
+# Baza
+server/data.db
+server/data.db-shm
+server/data.db-wal
+
+# Logi i artefakty
+*.log
+*.tar.gz
+
+# System
+.DS_Store
+
+# Edytory
+*.swp
+*~

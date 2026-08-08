@@ -1,0 +1,137 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# ============================================================================
+# Device Health Monitor — AGENT auto-setup on a PHONE (Termux)
+#
+# Downloads the agent, installs dependencies, registers with the server,
+# starts the agent and configures autostart via Termux:Boot.
+#
+# Usage (on the phone, after opening Termux):
+#   pkg install -y curl
+#   curl -fsSL http://192.168.0.10:9999/setup-termux.sh -o /tmp/setup-dhm.sh
+#   REGISTER_TOKEN=<server-token> DEVICE_NAME="Phone" sh /tmp/setup-dhm.sh
+#
+# Variables:
+#   SERVER_URL      DHM server address (default: auto-detect local IP)
+#   SERVE_URL       address of the install-file server (default: :9999 on the same IP)
+#   DEVICE_NAME     name on the dashboard (default: phone model)
+#   REPORT_INTERVAL report interval in seconds (default: 300 = 5 min)
+#   REGISTER_TOKEN  registration token from the server/server/.env
+#   SERVER_USER     SSH user on the server (for the scp fallback; default: user)
+# ============================================================================
+set -e
+
+SERVER_URL="${SERVER_URL:-}"
+SERVE_URL="${SERVE_URL:-}"
+DEVICE_NAME="${DEVICE_NAME:-$(getprop ro.product.model 2>/dev/null || echo 'Phone')}"
+DEVICE_TYPE=phone
+REPORT_INTERVAL="${REPORT_INTERVAL:-}"
+REGISTER_TOKEN="${REGISTER_TOKEN:-}"
+SERVER_USER="${SERVER_USER:-user}"
+
+INSTALL_DIR="$HOME/dhm-agent"
+AGENT_TAR="$HOME/dhm-agent.tar.gz"
+
+# --- Detect the phone's local IP (if `ip` is available) ---
+detect_ip() {
+  command -v ip >/dev/null 2>&1 && ip -4 addr show scope global 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | head -1
+}
+
+# --- Probe whether a DHM server responds at ip:port ---
+dhm_probe() {
+  curl -fsS -m 3 "http://$1:${2:-4000}/api/devices" -o /dev/null 2>/dev/null
+}
+
+# --- Server address (auto-detect local IP, otherwise ask) ---
+if [ -z "$SERVER_URL" ]; then
+  LOCAL_IP="$(detect_ip)"
+  if [ -n "$LOCAL_IP" ] && dhm_probe "$LOCAL_IP" 4000; then
+    SERVER_URL="http://$LOCAL_IP:4000"
+    echo "Detected DHM server at: $SERVER_URL"
+  else
+    if [ -n "$LOCAL_IP" ]; then
+      echo "No DHM server detected at $LOCAL_IP."
+    else
+      echo "Could not auto-detect the local IP."
+    fi
+    printf "DHM server address (http://IP:4000) [http://192.168.0.10:4000]: "
+    read -r ANS
+    SERVER_URL="${ANS:-http://192.168.0.10:4000}"
+  fi
+fi
+
+# --- Install-file server: same host, port 9999 ---
+if [ -z "$SERVE_URL" ]; then
+  SRV_IP="$(echo "$SERVER_URL" | sed 's|^http://||; s|:.*$||')"
+  SERVE_URL="http://$SRV_IP:9999"
+fi
+
+echo "=== DHM Agent — Termux ==="
+echo "Server:     $SERVER_URL"
+echo "Device:     $DEVICE_NAME (phone)"
+
+# --- Report interval (seconds): env -> prompt (default 300 = 5 min) ---
+if [ -z "$REPORT_INTERVAL" ]; then
+  printf "How often should the agent report? (seconds) [300]: "
+  read -r ANS
+  REPORT_INTERVAL="${ANS:-300}"
+fi
+case "$REPORT_INTERVAL" in
+  ''|*[!0-9]*) echo "Invalid REPORT_INTERVAL - using 300."; REPORT_INTERVAL=300 ;;
+esac
+echo "Reports:    every ${REPORT_INTERVAL}s"
+
+# --- Dependencies ---
+command -v curl >/dev/null 2>&1 || pkg install -y curl
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+  echo "Installing nodejs-lts..."
+  pkg install -y nodejs-lts
+fi
+
+# --- Download the agent ---
+mkdir -p "$INSTALL_DIR"
+echo "Downloading the agent..."
+if ! curl -fsSL "$SERVE_URL/dhm-agent.tar.gz" -o "$AGENT_TAR" 2>/dev/null; then
+  echo "  (fallback: scp from the server...)"
+  command -v scp >/dev/null 2>&1 || pkg install -y openssh
+  scp -o StrictHostKeyChecking=no "$SERVER_USER@$SRV_IP:/mnt/storage/media/DHM/dhm-agent.tar.gz" "$AGENT_TAR"
+fi
+tar xzf "$AGENT_TAR" -C "$INSTALL_DIR"
+rm -f "$AGENT_TAR" "$INSTALL_DIR/.api_key"
+
+# --- Agent dependencies ---
+cd "$INSTALL_DIR"
+echo "Installing dependencies (npm install)..."
+npm install --omit=dev
+
+# --- First registration ---
+echo "Registering with the server..."
+SERVER_URL="$SERVER_URL" DEVICE_TYPE="$DEVICE_TYPE" DEVICE_NAME="$DEVICE_NAME" REPORT_INTERVAL="$REPORT_INTERVAL" REGISTER_TOKEN="$REGISTER_TOKEN" node index.js >/tmp/dhm-agent.log 2>&1 &
+AGENT_PID=$!
+sleep 12
+kill "$AGENT_PID" 2>/dev/null || true
+if [ -f "$INSTALL_DIR/.api_key" ]; then
+  echo "[OK] Registered"
+else
+  echo "[ERROR] No key — check the log:"
+  cat /tmp/dhm-agent.log
+  exit 1
+fi
+
+# --- Autostart (Termux:Boot) ---
+mkdir -p "$HOME/.termux/boot"
+cat > "$HOME/.termux/boot/dhm-agent.sh" <<SH
+#!/data/data/com.termux/files/usr/bin/sh
+termux-wake-lock
+cd $HOME/dhm-agent
+DEVICE_TYPE=phone SERVER_URL="$SERVER_URL" REPORT_INTERVAL="$REPORT_INTERVAL" node index.js &
+SH
+chmod +x "$HOME/.termux/boot/dhm-agent.sh"
+
+# --- Start now ---
+nohup sh "$HOME/.termux/boot/dhm-agent.sh" >/dev/null 2>&1 &
+sleep 3
+
+echo
+echo "=== DONE ==="
+echo "Agent running (reports every ${REPORT_INTERVAL}s). Dashboard: $SERVER_URL"
+echo "Install 'Termux:Boot' from F-Droid and open it once — autostart after reboot."
