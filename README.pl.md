@@ -17,6 +17,16 @@ Dashboard + agenty do monitorowania kondycji urządzeń w sieci: CPU, RAM, dysk,
 - Sieć: na karcie sumy skumulowane (↓/↑), w szczegółach wykresy prędkości **MB/s** (IN/OUT) liczone z delt raportów.
 - Temperatura: czujnik CPU; na Windows, gdzie czujnik nie jest wystawiony, fallback do temperatury GPU.
 
+## Zrzuty ekranu
+
+Główny dashboard z urządzeniami, alertami i panelem offline:
+
+![Dashboard](docs/images/dashboard.png)
+
+Szczegóły urządzenia z wykresami (CPU, RAM, dysk, temperatura, sieć):
+
+![Szczegóły](docs/images/details.png)
+
 ## Bezpieczeństwo / model dostępu
 - **Odczyt otwarty, bez logowania** — każdy w sieci LAN widzi dashboard i `GET /api/*` + WebSocket.
 - **Zapis chroniony** — usuwanie urządzeń, zmiana nazw, rozwiązywanie alertów wymaga `X-Auth-Token` (= `AUTH_TOKEN` z `server/.env`).

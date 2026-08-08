@@ -17,6 +17,16 @@ Dashboard + agents for monitoring device health on your network: CPU, RAM, disk,
 - Network: cumulative totals on the card (↓/↑), speed charts **MB/s** (IN/OUT) in details, computed from report deltas.
 - Temperature: CPU sensor; on Windows, where the sensor is not exposed, falls back to GPU temperature.
 
+## Screenshots
+
+Main dashboard with devices, alerts and offline panel:
+
+![Dashboard](docs/images/dashboard.png)
+
+Device detail with charts (CPU, RAM, disk, temperature, network):
+
+![Details](docs/images/details.png)
+
 ## Security / access model
 - **Open reads, no login** — anyone on the LAN can view the dashboard and `GET /api/*` + WebSocket.
 - **Writes protected** — deleting devices, renaming, resolving alerts requires `X-Auth-Token` (= `AUTH_TOKEN` from `server/.env`).
