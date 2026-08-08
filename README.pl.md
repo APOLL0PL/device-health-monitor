@@ -223,4 +223,4 @@ device-health-monitor/
 
 ## Licencja
 
-MIT (do dodania — usuń sekcję, jeśli repo ma być prywatne).
+MIT — patrz [LICENSE](LICENSE).
