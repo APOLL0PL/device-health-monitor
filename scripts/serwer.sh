@@ -103,6 +103,26 @@ command -v npm  >/dev/null 2>&1 || fail "npm not found after install"
 command -v curl >/dev/null 2>&1 || fail "curl not found after install"
 ok "Node.js $(node --version)"
 
+# --- native build tools (better-sqlite3 needs a C++ compiler + make + python3) ---
+has_cxx() { command -v g++ >/dev/null 2>&1 || command -v c++ >/dev/null 2>&1 || command -v clang++ >/dev/null 2>&1; }
+if ! has_cxx || ! command -v make >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+    echo "Missing native build tools (better-sqlite3 needs a C++ compiler + make + python3). Installing..."
+    if command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get update -y && sudo apt-get install -y build-essential python3
+    elif command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y gcc-c++ make python3
+    elif command -v pacman >/dev/null 2>&1; then
+        sudo pacman -S --noconfirm base-devel python
+    else
+        fail "Missing C++ build tools for better-sqlite3 - install a C++ compiler, make and python3, then rerun.
+   (Debian/Ubuntu: sudo apt install build-essential python3, Fedora: sudo dnf install gcc-c++ make python3)"
+    fi
+fi
+if ! has_cxx || ! command -v make >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+    fail "Native build tools still missing - install a C++ compiler, make and python3, then rerun.
+   (Debian/Ubuntu: sudo apt install build-essential python3, Fedora: sudo dnf install gcc-c++ make python3)"
+fi
+
 # --- Get the code (GitHub Releases) ---
 if [ -f "$INSTALL_DIR/server/index.js" ]; then
     warn "DHM server files already present in $INSTALL_DIR - using them (no download)."

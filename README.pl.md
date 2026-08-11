@@ -31,6 +31,9 @@ Szczegóły urządzenia z wykresami (CPU, RAM, dysk, temperatura, sieć):
 ![Szczegóły](docs/images/details.png)
 
 ## Bezpieczeństwo / model dostępu
+- **Tylko LAN** — agenty i dashboard komunikują się z serwerem wyłącznie w sieci lokalnej,
+  na wybranym porcie (domyślnie `4000`). Bez chmury, bez wychodzenia do internetu.
+  Nie wystawiaj tego portu na internet bez znajomości konsekwencji.
 - **Odczyt otwarty, bez logowania** — każdy w sieci LAN widzi dashboard i `GET /api/*` + WebSocket.
 - **Zapis chroniony** — usuwanie urządzeń, zmiana nazw, rozwiązywanie alertów wymaga `X-Auth-Token` (= `AUTH_TOKEN` z `server/.env`).
 - **Rejestracja agentów** wymaga `register_token` (= `REGISTER_TOKEN` z `server/.env`) — blokuje fałszywe urządzenia i kradzież kluczy po MAC.

@@ -31,6 +31,9 @@ Device detail with charts (CPU, RAM, disk, temperature, network):
 ![Details](docs/images/details.png)
 
 ## Security / access model
+- **LAN-only** — agents and the dashboard talk to the server only over your local network,
+  on the chosen port (default `4000`). No cloud, no internet egress. Do not expose this port
+  to the internet unless you know what you are doing.
 - **Open reads, no login** — anyone on the LAN can view the dashboard and `GET /api/*` + WebSocket.
 - **Writes protected** — deleting devices, renaming, resolving alerts requires `X-Auth-Token` (= `AUTH_TOKEN` from `server/.env`).
 - **Agent registration** requires `register_token` (= `REGISTER_TOKEN` from `server/.env`) — blocks fake devices and MAC key theft.
