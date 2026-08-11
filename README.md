@@ -13,6 +13,90 @@ Dashboard + agents for monitoring device health on your network: CPU, RAM, disk,
 - **Alerts** — disk >90%, CPU >90% for 5 min, temperature >70°C. Offline is a **separate category** (not an alert).
 - **Self-monitor** — the server reports itself as a device (`server`), so it shows up on the dashboard without installing an agent.
 
+![DHM](docs/images/social-preview.png)
+
+## Quick start
+
+### 0. One-liner install (from GitHub)
+
+Run the server first, then the agents. The server prints the `REGISTER_TOKEN` at the end.
+
+**Server (Debian/Ubuntu/Fedora):**
+
+```bash
+curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/serwer.sh -o /tmp/serwer.sh && sh /tmp/serwer.sh
+```
+
+**Agent — Linux:**
+
+```bash
+curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && REGISTER_TOKEN=<token> SERVER_URL=http://<server-IP>:4000 sh /tmp/dhm.sh
+```
+
+**Agent — Windows (cmd):**
+
+```bat
+set SERVER_URL=http://<server-IP>:4000 && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && %TEMP%\user-win.bat
+```
+
+**Agent — phone (Termux, Android):**
+
+```bash
+pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=<token> SERVER_URL=http://<server-IP>:4000 sh /tmp/setup-dhm.sh
+```
+
+Each script auto-detects the server (own IP + gateway probe) or you pass `SERVER_URL` explicitly,
+installs Node.js if missing and configures autostart. All code comes from
+`releases/latest/download/...` — no build, no `git clone` needed.
+
+### 1. Server (Debian/Ubuntu/Fedora)
+
+```bash
+./scripts/serwer.sh
+```
+
+The script: installs Node (if missing), downloads `dhm-bundle.tar.gz` from GitHub Releases
+and extracts it to `~/device-health-monitor`, installs dependencies,
+**generates tokens** (`server/.env` + `dashboard/dist/config.js`),
+starts the server under pm2 (`dhm-server` :4000), opens ports in UFW and enables autostart (systemd).
+Dashboard: `http://<server-IP>:4000` — no login.
+
+Useful variables: `PORT`, `AUTH_TOKEN`, `REGISTER_TOKEN`, `PM2_NAME` (see script header).
+
+### 2. Agent — Linux
+
+```bash
+curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && REGISTER_TOKEN=<token> SERVER_URL=http://<server-IP>:4000 sh /tmp/dhm.sh
+# device name/type: DEVICE_NAME=Laptop DEVICE_TYPE=laptop
+```
+
+The script asks for `REPORT_INTERVAL` (default 60 s), downloads the agent from GitHub Releases,
+installs dependencies, registers the device and configures autostart (systemd user unit + linger).
+If `SERVER_URL` is empty it auto-detects (own IP + gateway probe), otherwise asks.
+
+### 3. Agent — Windows
+
+```bat
+set SERVER_URL=http://<server-IP>:4000 && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && %TEMP%\user-win.bat
+```
+
+Installs Node LTS (winget) and pm2, downloads the agent from GitHub Releases,
+installs dependencies, registers and enables autostart (Startup folder). Asks for `REPORT_INTERVAL`.
+Registration token: `set REGISTER_TOKEN=<token>` before running (or enter it when prompted).
+If `SERVER_URL` is empty, the script asks for it.
+Removal: `uninstall-win.bat`.
+
+### 4. Agent — phone (Termux, Android)
+
+```bash
+pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=<token> SERVER_URL=http://<server-IP>:4000 sh /tmp/setup-dhm.sh
+```
+
+The script: installs nodejs, downloads the agent from GitHub Releases, registers it, starts it and configures
+autostart via Termux:Boot (install "Termux:Boot" from F-Droid and open it once). Asks for
+`REPORT_INTERVAL` (default 300 s). Pass `SERVER_URL` explicitly — auto-detection often fails on phones
+(AP/client isolation); if empty the script probes your IP + gateway and otherwise asks.
+
 ## Dashboard features
 - Live view (WebSocket + 5 s polling).
 - Unit switcher **% ↔ MB/GB** (RAM and disk).
@@ -36,88 +120,6 @@ Main dashboard with devices, alerts and offline panel:
 - **Reports** require the `X-Api-Key` issued at registration.
 - Tokens are **generated automatically** by `serwer.sh` (`server/.env` + `dashboard/dist/config.js`, both in `.gitignore`). The frontend uses them automatically — no login.
 - CORS restricted, rate limiting, input validation, no `?token=` in URLs.
-
-## Quick start
-
-### 0. One-liner install (from GitHub)
-
-Run the server first, then the agents. The server prints the `REGISTER_TOKEN` at the end.
-
-**Server (Debian/Ubuntu/Fedora):**
-
-```bash
-curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/serwer.sh -o /tmp/serwer.sh && sh /tmp/serwer.sh
-```
-
-**Agent — Linux:**
-
-```bash
-curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && REGISTER_TOKEN=<token> sh /tmp/dhm.sh
-# custom server (e.g. not auto-detectable): SERVER_URL=http://<server-IP>:4000
-```
-
-**Agent — Windows (cmd):**
-
-```bat
-curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && %TEMP%\user-win.bat
-```
-
-**Agent — phone (Termux, Android):**
-
-```bash
-pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=<token> sh /tmp/setup-dhm.sh
-```
-
-Each script detects the server automatically (probes the local network), installs
-Node.js if missing and configures autostart. All code comes from
-`releases/latest/download/...` — no build, no `git clone` needed.
-
-### 1. Server (Debian/Ubuntu/Fedora)
-
-```bash
-./scripts/serwer.sh
-```
-
-The script: installs Node (if missing), downloads `dhm-bundle.tar.gz` from GitHub Releases
-and extracts it to `~/device-health-monitor`, installs dependencies,
-**generates tokens** (`server/.env` + `dashboard/dist/config.js`),
-starts the server under pm2 (`dhm-server` :4000), opens ports in UFW and enables autostart (systemd).
-Dashboard: `http://<server-IP>:4000` — no login.
-
-Useful variables: `PORT`, `AUTH_TOKEN`, `REGISTER_TOKEN`, `PM2_NAME` (see script header).
-
-### 2. Agent — Linux
-
-```bash
-./scripts/user-linux.sh
-# custom server address and device name:
-SERVER_URL=http://192.168.0.10:4000 DEVICE_NAME=Laptop DEVICE_TYPE=laptop ./scripts/user-linux.sh
-```
-
-The script asks for `REPORT_INTERVAL` (default 60 s), downloads the agent from GitHub Releases,
-installs dependencies, registers the device and configures autostart (systemd user unit + linger).
-Registration token: `REGISTER_TOKEN=<token>`.
-
-### 3. Agent — Windows
-
-```bat
-user-win.bat
-```
-
-Installs Node LTS (winget) and pm2, downloads the agent from GitHub Releases,
-installs dependencies, registers and enables autostart (Startup folder). Asks for `REPORT_INTERVAL`.
-Registration token: `set REGISTER_TOKEN=<token>` before running.
-Removal: `uninstall-win.bat`.
-
-### 4. Agent — phone (Termux, Android)
-
-```bash
-pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=<token> sh /tmp/setup-dhm.sh
-```
-
-The script: installs nodejs, downloads the agent from GitHub Releases, registers it, starts it and configures
-autostart via Termux:Boot (install "Termux:Boot" from F-Droid and open it once). Asks for
-`REPORT_INTERVAL` (default 300 s).
 
 ## Requirements
 

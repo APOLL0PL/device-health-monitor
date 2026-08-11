@@ -24,6 +24,8 @@ rem    REPORT_INTERVAL report interval   (default: 60 s)
 rem    REGISTER_TOKEN  registration token (or interactive prompt)
 rem ============================================================
 
+rem ---- server address: env -> prompt (auto-detect is not possible in a .bat) ----
+if "%SERVER_URL%"=="" set /p "SERVER_URL=DHM server address (http://IP:4000) [http://192.168.0.10:4000]: "
 if "%SERVER_URL%"=="" set "SERVER_URL=http://192.168.0.10:4000"
 if "%GITHUB_TAR%"=="" set "GITHUB_TAR=https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/dhm-agent.tar.gz"
 set "AGENT_DIR=C:\agent"

@@ -8,10 +8,10 @@
 # Usage (on the phone, after opening Termux):
 #   pkg install -y curl
 #   curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh
-#   REGISTER_TOKEN=<server-token> DEVICE_NAME="Phone" sh /tmp/setup-dhm.sh
+#   REGISTER_TOKEN=<server-token> SERVER_URL=http://<server-IP>:4000 DEVICE_NAME="Phone" sh /tmp/setup-dhm.sh
 #
 # Variables:
-#   SERVER_URL      DHM server address (default: auto-detect local IP)
+#   SERVER_URL      DHM server address (empty = probe own IP + gateway, then ask)
 #   GITHUB_URL      agent tarball on GitHub Releases
 #   DEVICE_NAME     name on the dashboard (default: phone model)
 #   REPORT_INTERVAL report interval in seconds (default: 300 = 5 min)
@@ -34,25 +34,39 @@ detect_ip() {
   command -v ip >/dev/null 2>&1 && ip -4 addr show scope global 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | head -1
 }
 
+# --- Detect the gateway (default route) IP ---
+detect_gateway() {
+  command -v ip >/dev/null 2>&1 && ip -4 route show default 2>/dev/null | awk '/via /{print $3; exit}'
+}
+
 # --- Probe whether a DHM server responds at ip:port ---
 dhm_probe() {
   curl -fsS -m 3 "http://$1:${2:-4000}/api/devices" -o /dev/null 2>/dev/null
 }
 
-# --- Server address (auto-detect local IP, otherwise ask) ---
+# --- Server address (probe own IP + gateway, otherwise ask) ---
 if [ -z "$SERVER_URL" ]; then
   LOCAL_IP="$(detect_ip)"
-  if [ -n "$LOCAL_IP" ] && dhm_probe "$LOCAL_IP" 4000; then
-    SERVER_URL="http://$LOCAL_IP:4000"
-    echo "Detected DHM server at: $SERVER_URL"
-  else
-    if [ -n "$LOCAL_IP" ]; then
-      echo "No DHM server detected at $LOCAL_IP."
-    else
-      echo "Could not auto-detect the local IP."
+  GATEWAY_IP="$(detect_gateway)"
+  for cand in "$LOCAL_IP" "$GATEWAY_IP"; do
+    if [ -n "$cand" ] && dhm_probe "$cand" 4000; then
+      SERVER_URL="http://$cand:4000"
+      echo "Detected DHM server at: $SERVER_URL"
+      break
     fi
-    printf "DHM server address (http://IP:4000) [http://192.168.0.10:4000]: "
-    read -r ANS
+  done
+fi
+if [ -z "$SERVER_URL" ]; then
+  DEFAULT_IP="${GATEWAY_IP:-$LOCAL_IP}"
+  echo "Could not auto-detect the DHM server (probed your phone IP and the gateway)."
+  echo "You can pass it explicitly: REGISTER_TOKEN=... SERVER_URL=http://<server-IP>:4000 sh /tmp/setup-dhm.sh"
+  if [ -n "$DEFAULT_IP" ]; then
+    printf "DHM server address (http://IP:4000) [http://%s:4000]: " "$DEFAULT_IP"
+    read -r ANS || true
+    SERVER_URL="${ANS:-http://$DEFAULT_IP:4000}"
+  else
+    printf "DHM server address (http://IP:4000): "
+    read -r ANS || true
     SERVER_URL="${ANS:-http://192.168.0.10:4000}"
   fi
 fi

@@ -15,7 +15,7 @@
 #   2. GitHub Releases (dhm-agent.tar.gz)      -> downloaded
 #
 # Variables:
-#   SERVER_URL      DHM server (empty = auto-detect local IP, then ask)
+#   SERVER_URL      DHM server (empty = probe own IP + gateway, then ask)
 #   DEVICE_NAME     dashboard name (default: hostname)
 #   DEVICE_TYPE     server|desktop|laptop (default: desktop)
 #   REPORT_INTERVAL report interval in seconds (default: 60, phone: 300)
@@ -25,7 +25,7 @@
 #
 # Example:
 #   ./user-linux.sh
-#   REGISTER_TOKEN=... SERVER_URL=http://192.168.0.10:4000 DEVICE_NAME=Laptop ./user-linux.sh
+#   REGISTER_TOKEN=... SERVER_URL=http://<server-IP>:4000 DEVICE_NAME=Laptop ./user-linux.sh
 # ============================================================================
 set -euo pipefail
 
@@ -67,7 +67,7 @@ if ! echo "$REPORT_INTERVAL" | grep -qE '^[0-9]{1,5}$' || [ "$REPORT_INTERVAL" -
 fi
 ok "Report interval: ${REPORT_INTERVAL}s"
 
-# ---- server address (auto-detect local IP, otherwise ask) ----
+# ---- server address (probe own IP + gateway, otherwise ask) ----
 get_local_ip() {
     local ip
     ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}')
@@ -77,20 +77,31 @@ get_local_ip() {
     echo "$ip"
 }
 
+get_gateway_ip() {
+    ip -4 route show default 2>/dev/null | awk '/via /{print $3; exit}'
+}
+
 dhm_probe() {
     curl -fsS -m 3 "http://$1:${2:-4000}/api/devices" -o /dev/null 2>/dev/null
 }
 
 if [ -z "$SERVER_URL" ]; then
-    DEFAULT_IP="$(get_local_ip)"
-    DEFAULT_URL="http://${DEFAULT_IP:-localhost}:4000"
-    if [ -n "$DEFAULT_IP" ] && dhm_probe "$DEFAULT_IP" 4000; then
-        SERVER_URL="http://$DEFAULT_IP:4000"
-        ok "Detected DHM server at: $SERVER_URL"
-    else
-        [ -n "$DEFAULT_IP" ] && echo "No DHM server detected at $DEFAULT_IP."
-        ans=""
-        read -r -p "DHM server address (http://IP:4000) [$DEFAULT_URL]: " ans || true
+    LOCAL_IP="$(get_local_ip)"
+    GATEWAY_IP="$(get_gateway_ip)"
+    for cand in "$LOCAL_IP" "$GATEWAY_IP"; do
+        if [ -n "$cand" ] && dhm_probe "$cand" 4000; then
+            SERVER_URL="http://$cand:4000"
+            ok "Detected DHM server at: $SERVER_URL"
+            break
+        fi
+    done
+    if [ -z "$SERVER_URL" ]; then
+        DEFAULT_IP="${GATEWAY_IP:-$LOCAL_IP}"
+        [ -z "$DEFAULT_IP" ] && DEFAULT_IP=localhost
+        DEFAULT_URL="http://${DEFAULT_IP}:4000"
+        warn "Could not auto-detect the DHM server (probed own IP + gateway)."
+        printf 'DHM server address (http://IP:4000) [%s]: ' "$DEFAULT_URL"
+        read -r ans || true
         SERVER_URL="${ans:-$DEFAULT_URL}"
     fi
 fi
