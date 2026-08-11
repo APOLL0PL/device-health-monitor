@@ -9,12 +9,15 @@ rem
 rem  Installs the DHM agent on this PC, registers the device with
 rem  the DHM server and enables autostart (after login).
 rem
-rem  Fully self-contained - NO GitHub, NO internet needed.
+rem  Fully self-contained on the LAN (local tarball / :9999 / Samba). When
+rem  no local copy exists - e.g. when run via the one-liner from the README -
+rem  it downloads the agent from GitHub Releases automatically.
 rem  Where the agent code comes from (first match wins):
 rem    1) existing folder C:\agent           -> used as-is
 rem    2) dhm-agent.tar.gz next to this .bat -> extracted
 rem    3) LAN file server  (:9999)           -> downloaded
 rem    4) Samba share      (\\server\NAS\media\DHM)
+rem    5) GitHub Releases  (dhm-agent.tar.gz)
 rem  After the install the downloaded tarball is removed.
 rem
 rem  Variables (set before running):
@@ -30,6 +33,7 @@ rem ============================================================
 if "%SERVER_URL%"=="" set "SERVER_URL=http://192.168.0.10:4000"
 if "%SERVE_URL%"=="" set "SERVE_URL=http://192.168.0.10:9999"
 if "%SMB_TAR%"=="" set "SMB_TAR=\\192.168.0.10\NAS\media\DHM\dhm-agent.tar.gz"
+if "%GITHUB_TAR%"=="" set "GITHUB_TAR=https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/dhm-agent.tar.gz"
 set "AGENT_DIR=C:\agent"
 set "AGENT_TAR=%TEMP%\dhm-agent.tar.gz"
 set "LOCAL_TAR=%~dp0dhm-agent.tar.gz"
@@ -81,7 +85,7 @@ rem ---- stop the old agent ----
 pm2 kill >nul 2>nul
 taskkill /f /im node.exe >nul 2>nul
 
-rem ---- get the agent code (self-contained - no GitHub, no internet) ----
+rem ---- get the agent code (offline on LAN, GitHub Releases as fallback) ----
 if exist "%AGENT_DIR%\index.js" goto :have_agent
 rmdir /s /q "%AGENT_DIR%" >nul 2>nul
 mkdir "%AGENT_DIR%" >nul 2>nul
@@ -94,10 +98,14 @@ if exist "%LOCAL_TAR%" (
 )
 del "%AGENT_TAR%" >nul 2>nul
 echo Downloading the agent...
-curl -fsSL "%SERVE_URL%/dhm-agent.tar.gz" -o "%AGENT_TAR%" >nul 2>nul
+curl -fsSL --max-time 10 "%SERVE_URL%/dhm-agent.tar.gz" -o "%AGENT_TAR%" >nul 2>nul
 if not exist "%AGENT_TAR%" (
     echo   fallback: Samba
     copy /Y "%SMB_TAR%" "%AGENT_TAR%" >nul 2>nul
+)
+if not exist "%AGENT_TAR%" (
+    echo   fallback: GitHub Releases
+    curl -fsSL --max-time 60 "%GITHUB_TAR%" -o "%AGENT_TAR%" >nul 2>nul
 )
 if exist "%AGENT_TAR%" (
     tar xf "%AGENT_TAR%" -C "%AGENT_DIR%"

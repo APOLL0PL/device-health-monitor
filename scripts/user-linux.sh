@@ -6,13 +6,16 @@
 # DHM server and enables autostart (systemd user unit + linger, so it also
 # runs after reboot without login).
 #
-# Fully self-contained - NO GitHub, NO internet needed.
+# Fully self-contained on the LAN (local tarball / :9999). When no local
+# copy exists - e.g. when run via the one-liner from the README - it
+# downloads the agent from GitHub Releases automatically.
 #
 # Where the agent code comes from (first match wins):
 #   1. INSTALL_DIR already contains index.js   -> used as-is
 #   2. dhm-agent.tar.gz next to this script    -> extracted
 #   3. dhm-bundle.tar.gz next to this script   -> agent/ extracted from it
 #   4. LAN file server  (:9999)                -> downloaded (internal net)
+#   5. GitHub Releases (dhm-agent.tar.gz)      -> downloaded
 # After the install the script cleans up (removes downloaded tarball).
 #
 # Variables:
@@ -24,6 +27,7 @@
 #   REGISTER_TOKEN  registration token (or dhm-token.txt next to this
 #                   script, or interactive prompt)
 #   INSTALL_DIR     install dir (default: $HOME/dhm-agent)
+#   GITHUB_URL      agent tarball on GitHub Releases (fallback download)
 #
 # Example:
 #   ./user-linux.sh
@@ -34,6 +38,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SERVER_URL="${SERVER_URL:-}"
 SERVE_URL="${SERVE_URL:-http://192.168.0.10:9999}"
+GITHUB_URL="${GITHUB_URL:-https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/dhm-agent.tar.gz}"
 DEVICE_NAME="${DEVICE_NAME:-$(hostname)}"
 DEVICE_TYPE="${DEVICE_TYPE:-desktop}"
 REGISTER_TOKEN="${REGISTER_TOKEN:-}"
@@ -134,9 +139,10 @@ command -v npm  >/dev/null 2>&1 || fail "npm not found after install"
 command -v curl >/dev/null 2>&1 || fail "curl not found after install"
 ok "Node.js $(node --version)"
 
-# ---- get the agent code (self-contained - no GitHub, no internet) ----
+# ---- get the agent code (offline on LAN, GitHub Releases as fallback) ----
 # Priority: 1) existing install, 2) dhm-agent.tar.gz next to script,
-#           3) dhm-bundle.tar.gz next to script, 4) LAN server :9999.
+#           3) dhm-bundle.tar.gz next to script, 4) LAN server :9999,
+#           5) GitHub Releases.
 if [ -f "$INSTALL_DIR/index.js" ]; then
     warn "Agent files already present in $INSTALL_DIR - using them (no download)."
 else
@@ -157,14 +163,20 @@ else
         [ -d "$TMP_BD/agent" ] || fail "dhm-bundle.tar.gz has no agent/ directory."
         cp -a "$TMP_BD/agent/." "$INSTALL_DIR/"
         rm -rf "$TMP_BD"
-    elif curl -fsSL "$SERVE_URL/dhm-agent.tar.gz" -o "$TMP_AGENT" 2>/dev/null; then
+    elif curl -fsSL --max-time 10 "$SERVE_URL/dhm-agent.tar.gz" -o "$TMP_AGENT" 2>/dev/null; then
         warn "Downloading agent from $SERVE_URL ..."
+        tar xzf "$TMP_AGENT" -C "$INSTALL_DIR" 2>/dev/null \
+            || fail "Could not extract the downloaded agent tarball."
+        CLEANUP_AGENT=1
+    elif curl -fsSL --max-time 120 "$GITHUB_URL" -o "$TMP_AGENT" 2>/dev/null; then
+        warn "Downloading agent from GitHub Releases ..."
         tar xzf "$TMP_AGENT" -C "$INSTALL_DIR" 2>/dev/null \
             || fail "Could not extract the downloaded agent tarball."
         CLEANUP_AGENT=1
     else
         fail "No agent code found. Put dhm-agent.tar.gz (or dhm-bundle.tar.gz) next to
-   this script, or make the LAN server :9999 reachable."
+   this script, make the LAN server :9999 reachable, or let the script
+   download it from GitHub Releases (needs internet)."
     fi
     rm -f "$TMP_AGENT"
     if [ "$CLEANUP_AGENT" = "1" ]; then

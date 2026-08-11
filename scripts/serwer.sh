@@ -6,12 +6,14 @@
 # autostart (systemd). Also starts the LAN install-file server (:9999)
 # used by the agent installers.
 #
-# Fully self-contained - NO GitHub, NO internet needed.
+# Works fully offline on the LAN (local tarball next to this script).
+# When no local copy exists - e.g. when run via the one-liner from the
+# README - it downloads the bundle from GitHub Releases automatically.
 #
 # Where the code comes from (first match wins):
 #   1. INSTALL_DIR already contains server/index.js  -> used as-is
 #   2. dhm-bundle.tar.gz next to this script          -> extracted
-#   3. existing folder in INSTALL_DIR                 -> used as-is
+#   3. GitHub Releases (dhm-bundle.tar.gz)            -> downloaded
 # After a fresh install the script cleans up (removes the bundle + .git).
 #
 # Variables (optionally set before running):
@@ -39,6 +41,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/device-health-monitor}"
 BUNDLE="${BUNDLE:-$SCRIPT_DIR/dhm-bundle.tar.gz}"
+GITHUB_URL="${GITHUB_URL:-https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/dhm-bundle.tar.gz}"
 PORT="${PORT:-}"
 AUTH_TOKEN="${AUTH_TOKEN:-}"
 REGISTER_TOKEN="${REGISTER_TOKEN:-}"
@@ -98,21 +101,22 @@ ok "Chosen port: $PORT"
 if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
     echo "Node.js not found. Installing..."
     if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update -y && sudo apt-get install -y nodejs npm build-essential python3
+        sudo apt-get update -y && sudo apt-get install -y nodejs npm build-essential python3 curl
     elif command -v dnf >/dev/null 2>&1; then
-        sudo dnf install -y nodejs npm gcc-c++ make python3
+        sudo dnf install -y nodejs npm gcc-c++ make python3 curl
     elif command -v pacman >/dev/null 2>&1; then
-        sudo pacman -S --noconfirm nodejs npm base-devel python
+        sudo pacman -S --noconfirm nodejs npm base-devel python curl
     else
         fail "Unknown package manager - install Node.js >= 18 manually (https://nodejs.org)."
     fi
 fi
 command -v node >/dev/null 2>&1 || fail "node not found after install"
 command -v npm  >/dev/null 2>&1 || fail "npm not found after install"
+command -v curl >/dev/null 2>&1 || fail "curl not found after install"
 ok "Node.js $(node --version)"
 
-# --- Get the code (self-contained - no GitHub, no internet) ---
-# Priority: 1) existing install, 2) bundle next to script, 3) existing folder.
+# --- Get the code (offline on LAN, GitHub Releases as fallback) ---
+# Priority: 1) existing install, 2) bundle next to script, 3) GitHub.
 if [ -f "$INSTALL_DIR/server/index.js" ]; then
     warn "DHM server files already present in $INSTALL_DIR - using them."
 elif [ -f "$BUNDLE" ]; then
@@ -123,8 +127,17 @@ elif [ -f "$BUNDLE" ]; then
     CLEANUP_BUNDLE=1
 else
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    fail "No DHM server code found. Put dhm-bundle.tar.gz next to this script
-   (or make $INSTALL_DIR/server/index.js exist)."
+    warn "No local bundle found - downloading from GitHub Releases..."
+    TMP_DL="$(mktemp)"
+    if ! curl -fsSL --max-time 120 "$GITHUB_URL" -o "$TMP_DL" 2>/dev/null; then
+        rm -f "$TMP_DL"
+        fail "Could not download the DHM bundle from GitHub.
+   Check the internet connection / GITHUB_URL, or put dhm-bundle.tar.gz
+   next to this script (or make $INSTALL_DIR/server/index.js exist)."
+    fi
+    tar xzf "$TMP_DL" -C "$INSTALL_DIR" --strip-components=1
+    rm -f "$TMP_DL"
+    CLEANUP_BUNDLE=1
 fi
 [ -f "$INSTALL_DIR/server/index.js" ] || fail "DHM server files missing in $INSTALL_DIR/server (index.js not found)."
 

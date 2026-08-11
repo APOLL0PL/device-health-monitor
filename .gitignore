@@ -20,6 +20,7 @@ server/data.db-wal
 # Logi i artefakty
 *.log
 *.tar.gz
+release/
 
 # System
 .DS_Store

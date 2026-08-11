@@ -59,11 +59,45 @@ Agent na komputerach raportuje co **60 s**, na telefonach/Androida co **5 min**
 | Agent Windows | Windows 10/11, Node.js LTS (skrypt doinstaluje przez winget) |
 | Telefon | Termux + `nodejs-lts` (Android) |
 
-> Instalacja jest **samowystarczalna** — nie potrzebuje dostępu do GitHub ani internetu.
+> Instalacja jest **samowystarczalna** na LAN-ie — nie potrzebuje dostępu do GitHub ani internetu.
 > Skrypty biorą kod z: lokalnego `dhm-bundle.tar.gz` / `dhm-agent.tar.gz` obok skryptu,
 > albo z serwera plików LAN (`:9999`).
+> **Poza LAN-em** (1-linery poniżej) automatycznie pobierają kod z **GitHub Releases**.
 
 ## Szybki start
+
+### 0. Instalacja 1-linerem (z GitHub)
+
+Najpierw serwer, potem agenty. Serwer na końcu wypisuje `REGISTER_TOKEN`.
+
+**Serwer (Debian/Ubuntu/Fedora):**
+
+```bash
+curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/serwer.sh -o /tmp/serwer.sh && sh /tmp/serwer.sh
+```
+
+**Agent — Linux:**
+
+```bash
+curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && REGISTER_TOKEN=<token> sh /tmp/dhm.sh
+# własny serwer (np. gdy auto-detekcja nie działa): SERVER_URL=http://<IP-serwera>:4000
+```
+
+**Agent — Windows (cmd):**
+
+```bat
+curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && %TEMP%\user-win.bat
+```
+
+**Agent — telefon (Termux, Android):**
+
+```bash
+pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=<token> sh /tmp/setup-dhm.sh
+```
+
+Każdy skrypt sam wykrywa serwer (probe w sieci lokalnej), instaluje Node.js jeśli brak
+i konfiguruje autostart. Cały kod pochodzi z `releases/latest/download/...` — bez buildowania
+i bez `git clone`.
 
 ### 1. Serwer (Debian/Ubuntu/Fedora)
 
@@ -87,7 +121,8 @@ Użyteczne zmienne: `PORT`, `AUTH_TOKEN`, `REGISTER_TOKEN`, `DHM_INSTALL_DIR`, `
 SERVER_URL=http://192.168.0.10:4000 DEVICE_NAME=Laptop DEVICE_TYPE=laptop ./scripts/user-linux.sh
 ```
 
-Skrypt pyta o `REPORT_INTERVAL` (default 60 s), pobiera agenta (lokalny tar / bundle / LAN `:9999`),
+Skrypt pyta o `REPORT_INTERVAL` (default 60 s), pobiera agenta
+(lokalny tar / bundle / LAN `:9999` / GitHub Releases),
 instaluje zależności, rejestruje urządzenie i konfiguruje autostart (systemd user unit + linger).
 Token rejestracji: `REGISTER_TOKEN=<token>` (lub `dhm-token.txt` obok skryptu).
 
@@ -97,7 +132,7 @@ Token rejestracji: `REGISTER_TOKEN=<token>` (lub `dhm-token.txt` obok skryptu).
 user-win.bat
 ```
 
-Instaluje Node LTS (winget) i pm2, pobiera agenta (lokalny tar / LAN `:9999` / Samba),
+Instaluje Node LTS (winget) i pm2, pobiera agenta (lokalny tar / LAN `:9999` / Samba / GitHub Releases),
 instaluje zależności, rejestruje i włącza autostart (folder Startup). Pyta o `REPORT_INTERVAL`.
 Token rejestracji: `set REGISTER_TOKEN=<token>` przed uruchomieniem.
 Usunięcie: `uninstall-win.bat`.
@@ -228,6 +263,7 @@ device-health-monitor/
 │   ├── user-linux.sh    ← agent Linux
 │   ├── user-win.bat     ← agent Windows
 │   ├── setup-termux.sh  ← agent telefon (Termux)
+│   ├── build-release.sh ← buduje tarballe na GitHub Release
 │   ├── uninstall-serwer.sh / uninstall-linux.sh / uninstall-win.bat
 ├── .env.example
 ├── README.md       ← English

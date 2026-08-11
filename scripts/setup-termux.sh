@@ -7,12 +7,13 @@
 #
 # Usage (on the phone, after opening Termux):
 #   pkg install -y curl
-#   curl -fsSL http://192.168.0.10:9999/setup-termux.sh -o /tmp/setup-dhm.sh
+#   curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh
 #   REGISTER_TOKEN=<server-token> DEVICE_NAME="Phone" sh /tmp/setup-dhm.sh
 #
 # Variables:
 #   SERVER_URL      DHM server address (default: auto-detect local IP)
 #   SERVE_URL       address of the install-file server (default: :9999 on the same IP)
+#   GITHUB_URL      agent tarball on GitHub Releases (fallback download)
 #   DEVICE_NAME     name on the dashboard (default: phone model)
 #   REPORT_INTERVAL report interval in seconds (default: 300 = 5 min)
 #   REGISTER_TOKEN  registration token from the server/server/.env
@@ -22,6 +23,7 @@ set -e
 
 SERVER_URL="${SERVER_URL:-}"
 SERVE_URL="${SERVE_URL:-}"
+GITHUB_URL="${GITHUB_URL:-https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/dhm-agent.tar.gz}"
 DEVICE_NAME="${DEVICE_NAME:-$(getprop ro.product.model 2>/dev/null || echo 'Phone')}"
 DEVICE_TYPE=phone
 REPORT_INTERVAL="${REPORT_INTERVAL:-}"
@@ -87,13 +89,16 @@ if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
   pkg install -y nodejs-lts
 fi
 
-# --- Download the agent ---
+# --- Download the agent (LAN :9999 -> GitHub Releases -> scp) ---
 mkdir -p "$INSTALL_DIR"
 echo "Downloading the agent..."
-if ! curl -fsSL "$SERVE_URL/dhm-agent.tar.gz" -o "$AGENT_TAR" 2>/dev/null; then
-  echo "  (fallback: scp from the server...)"
-  command -v scp >/dev/null 2>&1 || pkg install -y openssh
-  scp -o StrictHostKeyChecking=no "$SERVER_USER@$SRV_IP:/mnt/storage/media/DHM/dhm-agent.tar.gz" "$AGENT_TAR"
+if ! curl -fsSL --max-time 10 "$SERVE_URL/dhm-agent.tar.gz" -o "$AGENT_TAR" 2>/dev/null; then
+  echo "  (fallback: GitHub Releases...)"
+  if ! curl -fsSL --max-time 120 "$GITHUB_URL" -o "$AGENT_TAR" 2>/dev/null; then
+    echo "  (fallback: scp from the server...)"
+    command -v scp >/dev/null 2>&1 || pkg install -y openssh
+    scp -o StrictHostKeyChecking=no "$SERVER_USER@$SRV_IP:/mnt/storage/media/DHM/dhm-agent.tar.gz" "$AGENT_TAR"
+  fi
 fi
 tar xzf "$AGENT_TAR" -C "$INSTALL_DIR"
 rm -f "$AGENT_TAR" "$INSTALL_DIR/.api_key"
