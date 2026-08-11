@@ -20,6 +20,10 @@ jobs:
         working-directory: server
         run: npm ci
 
+      - name: Server tests
+        working-directory: server
+        run: npm test
+
       - name: Agent dependencies
         working-directory: agent
         run: npm ci

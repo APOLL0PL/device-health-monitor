@@ -204,22 +204,6 @@ Pole urządzenia: `name`, `ip`, `type` (`server`/`desktop`/`laptop`/`phone`), `o
 | `high_temp` | temperatura > 70°C | warning, > 80°C → critical |
 | `high_cpu` | CPU > 90% utrzymujące się > 5 min | warning |
 
-### Kody statusu
-`200` OK · `400` walidacja · `401` brak/zły token · `403` zły klucz agenta / `register_token` ·
-`404` brak urządzenia · `429` rate limit · `503` token nie skonfigurowany
-
-## Architektura
-
-```
-┌─────────────┐   HTTP/WS :4000   ┌─────────────────┐
-│  urządzenia │ ─────────────────▶ │  serwer DHM      │
-│  (agent)    │  register/report   │  server/ + SQLite│──▶ dashboard (React)
-└─────────────┘                    └─────────────────┘
-```
-
-Agent na komputerach raportuje co **60 s**, na telefonach/Androida co **5 min**
-(ustawisz to w instalatorze, patrz `REPORT_INTERVAL`).
-
 ## Rozwiązywanie problemów
 
 - **Urządzenie się nie pojawia / crash-loop** — `pm2 logs dhm-agent`; sprawdź, czy serwer odpowiada:

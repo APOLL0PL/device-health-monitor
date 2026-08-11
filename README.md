@@ -207,22 +207,6 @@ Device fields: `name`, `ip`, `type` (`server`/`desktop`/`laptop`/`phone`), `os_n
 | `high_temp` | temperature > 70°C | warning, > 80°C → critical |
 | `high_cpu` | CPU > 90% sustained > 5 min | warning |
 
-### Status codes
-`200` OK · `400` validation · `401` missing/bad token · `403` bad agent key / `register_token` ·
-`404` device not found · `429` rate limit · `503` token not configured
-
-## Architecture
-
-```
-┌─────────────┐   HTTP/WS :4000   ┌─────────────────┐
-│  devices    │ ─────────────────▶ │  DHM server     │
-│  (agent)    │  register/report   │  server/ + SQLite│──▶ dashboard (React)
-└─────────────┘                    └─────────────────┘
-```
-
-Agents on computers report every **60 s**, on phones/Android every **5 min**
-(set in the installer — see `REPORT_INTERVAL`).
-
 ## Troubleshooting
 
 - **Device doesn't show up / crash-loop** — check `pm2 logs dhm-agent`; verify the server responds:
