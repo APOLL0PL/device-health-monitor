@@ -84,7 +84,7 @@ app.post('/api/agent/register', limiterRegister, (req, res) => {
   if (!device) {
     return res.status(409).json({ error: 'No reliable identity (IP loopback without MAC)' });
   }
-  broadcast({ type: 'device_update', device: store.getDevice(device.id) });
+  broadcast({ type: 'device_update', device: store.publicDevice(store.getDevice(device.id)) });
   res.json(device);
 });
 
@@ -92,14 +92,14 @@ app.post('/api/agent/report', limiterReport, authenticateAgent, (req, res) => {
   store.recordMetrics(req.device.id, req.body || {});
   const device = store.getDevice(req.device.id);
   const metrics = store.getLatestMetrics(req.device.id);
-  broadcast({ type: 'metrics', deviceId: req.device.id, metrics, device });
+  broadcast({ type: 'metrics', deviceId: req.device.id, metrics, device: store.publicDevice(device) });
   res.json({ ok: true });
 });
 
 // Dashboard endpoints (read-only, open dashboard)
 app.get('/api/devices', (req, res) => {
   const devices = store.getAllDevices().map((d) => {
-    const { api_key, ...device } = d;
+    const device = store.publicDevice(d);
     const m = store.getLatestMetrics(device.id);
     return {
       ...device,
@@ -127,7 +127,7 @@ app.get('/api/devices', (req, res) => {
 app.get('/api/devices/:id', (req, res) => {
   const row = store.getDevice(Number(req.params.id));
   if (!row) return res.status(404).json({ error: 'Not found' });
-  const { api_key, ...device } = row;
+  const device = store.publicDevice(row);
   const metrics = store.getLatestMetrics(device.id);
   res.json({ device, metrics });
 });
@@ -210,13 +210,22 @@ function broadcast(data) {
   }
 }
 
-setInterval(() => {
+const summaryTimer = setInterval(() => {
   store.checkOfflineDevices();
   const summary = store.getDeviceSummary();
   broadcast({ type: 'summary', summary });
 }, 60_000);
 
+const selfTimer = selfmonitor.start(broadcast);
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Device Health Monitor server on http://0.0.0.0:${PORT}`);
-  selfmonitor.start(broadcast);
 });
+
+function shutdown() {
+  clearInterval(summaryTimer);
+  clearInterval(selfTimer);
+  server.close();
+}
+
+module.exports = { server, shutdown };

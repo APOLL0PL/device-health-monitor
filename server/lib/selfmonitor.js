@@ -117,7 +117,7 @@ async function report(broadcast) {
     const device = store.getDevice(selfDeviceId);
     const latest = store.getLatestMetrics(selfDeviceId);
     if (typeof broadcast === 'function') {
-      broadcast({ type: 'metrics', deviceId: selfDeviceId, metrics: latest, device });
+      broadcast({ type: 'metrics', deviceId: selfDeviceId, metrics: latest, device: store.publicDevice(device) });
     }
   } catch (err) {
     console.error(`[self-monitor] ${err.message}`);
@@ -127,8 +127,7 @@ async function report(broadcast) {
 function start(broadcast) {
   ensureRegistered();
   report(broadcast);
-  setInterval(() => report(broadcast), INTERVAL);
-  console.log(`Self-monitor: reporting ${DEVICE_NAME} to dashboard every ${INTERVAL / 1000}s`);
+  return setInterval(() => report(broadcast), INTERVAL);
 }
 
 module.exports = { start };

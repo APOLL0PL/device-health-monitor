@@ -65,6 +65,12 @@ function getAllDevices() {
   return db.prepare('SELECT * FROM devices ORDER BY is_online DESC, name').all();
 }
 
+function publicDevice(d) {
+  if (!d) return d;
+  const { api_key, ...device } = d;
+  return device;
+}
+
 function getDevice(id) {
   return db.prepare('SELECT * FROM devices WHERE id = ?').get(id);
 }
@@ -248,6 +254,7 @@ function getDeviceSummary() {
 module.exports = {
   registerDevice,
   getAllDevices,
+  publicDevice,
   getDevice,
   getDeviceByKey,
   updateDeviceName,
