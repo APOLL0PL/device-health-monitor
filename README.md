@@ -28,7 +28,7 @@ Main dashboard with devices, alerts and offline panel:
 
 Device detail with charts (CPU, RAM, disk, temperature, network):
 
-![Details](docs/images/details.png)
+![Details](docs/images/details.jpg)
 
 ## Security / access model
 - **LAN-only** — agents and the dashboard talk to the server only over your local network,

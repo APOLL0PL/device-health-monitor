@@ -28,7 +28,7 @@ Główny dashboard z urządzeniami, alertami i panelem offline:
 
 Szczegóły urządzenia z wykresami (CPU, RAM, dysk, temperatura, sieć):
 
-![Szczegóły](docs/images/details.png)
+![Szczegóły](docs/images/details.jpg)
 
 ## Bezpieczeństwo / model dostępu
 - **Tylko LAN** — agenty i dashboard komunikują się z serwerem wyłącznie w sieci lokalnej,
