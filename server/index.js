@@ -139,6 +139,10 @@ app.get('/api/summary', (req, res) => {
   res.json(store.getDeviceSummary());
 });
 
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, uptime: process.uptime(), version: require('./package.json').version || null });
+});
+
 // --- Endpointy zapisu (wymagają X-Auth-Token) ---
 app.patch('/api/devices/:id', limiterWrite, authWrite, (req, res) => {
   const id = Number(req.params.id);
