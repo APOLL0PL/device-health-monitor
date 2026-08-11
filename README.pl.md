@@ -37,30 +37,6 @@ Główny dashboard z urządzeniami, alertami i panelem offline:
 - Tokeny **generują się automatycznie** w `serwer.sh` (`server/.env` + `dashboard/dist/config.js`, oba w `.gitignore`). Frontend używa ich sam — zero logowania.
 - CORS ograniczony, rate limiting, walidacja wejścia, brak `?token=` w URL.
 
-## Architektura
-
-```
-┌─────────────┐   HTTP/WS :4000   ┌─────────────────┐
-│  urządzenia │ ─────────────────▶ │  serwer DHM      │
-│  (agent)    │  register/report   │  server/ + SQLite│──▶ dashboard (React)
-└─────────────┘                    └─────────────────┘
-```
-
-Agent na komputerach raportuje co **60 s**, na telefonach/Androida co **5 min**
-(ustawisz to w instalatorze, patrz `REPORT_INTERVAL`).
-
-## Wymagania
-
-| Składnik | Wymaganie |
-|----------|-----------|
-| Serwer    | Linux (Debian/Ubuntu/Fedora/RPi), Node.js ≥ 18, npm |
-| Agent Linux | Node.js, npm |
-| Agent Windows | Windows 10/11, Node.js LTS (skrypt doinstaluje przez winget) |
-| Telefon | Termux + `nodejs-lts` (Android) |
-
-> Wszystkie instalatory pobierają kod z **GitHub Releases** — bez buildowania, bez `git clone`,
-> bez `node_modules` w repo. Instalatory NIE kasują niczego; do usunięcia DHM służą skrypty uninstall.
-
 ## Szybki start
 
 ### 0. Instalacja 1-linerem (z GitHub)
@@ -142,6 +118,18 @@ pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-moni
 Skrypt: instaluje nodejs, pobiera agenta z GitHub Releases, rejestruje, startuje i konfiguruje autostart przez
 Termux:Boot (zainstaluj „Termux:Boot" z F-Droid i otwórz raz). Pyta o `REPORT_INTERVAL` (default 300 s).
 
+## Wymagania
+
+| Składnik | Wymaganie |
+|----------|-----------|
+| Serwer    | Linux (Debian/Ubuntu/Fedora/RPi), Node.js ≥ 18, npm |
+| Agent Linux | Node.js, npm |
+| Agent Windows | Windows 10/11, Node.js LTS (skrypt doinstaluje przez winget) |
+| Telefon | Termux + `nodejs-lts` (Android) |
+
+> Wszystkie instalatory pobierają kod z **GitHub Releases** — bez buildowania, bez `git clone`,
+> bez `node_modules` w repo. Instalatory NIE kasują niczego; do usunięcia DHM służą skrypty uninstall.
+
 ## Skrypty auto-instalacji
 
 | Platforma | Skrypt | Co robi |
@@ -211,6 +199,18 @@ Pole urządzenia: `name`, `ip`, `type` (`server`/`desktop`/`laptop`/`phone`), `o
 ### Kody statusu
 `200` OK · `400` walidacja · `401` brak/zły token · `403` zły klucz agenta / `register_token` ·
 `404` brak urządzenia · `429` rate limit · `503` token nie skonfigurowany
+
+## Architektura
+
+```
+┌─────────────┐   HTTP/WS :4000   ┌─────────────────┐
+│  urządzenia │ ─────────────────▶ │  serwer DHM      │
+│  (agent)    │  register/report   │  server/ + SQLite│──▶ dashboard (React)
+└─────────────┘                    └─────────────────┘
+```
+
+Agent na komputerach raportuje co **60 s**, na telefonach/Androida co **5 min**
+(ustawisz to w instalatorze, patrz `REPORT_INTERVAL`).
 
 ## Rozwiązywanie problemów
 

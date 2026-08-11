@@ -37,30 +37,6 @@ Main dashboard with devices, alerts and offline panel:
 - Tokens are **generated automatically** by `serwer.sh` (`server/.env` + `dashboard/dist/config.js`, both in `.gitignore`). The frontend uses them automatically — no login.
 - CORS restricted, rate limiting, input validation, no `?token=` in URLs.
 
-## Architecture
-
-```
-┌─────────────┐   HTTP/WS :4000   ┌─────────────────┐
-│  devices    │ ─────────────────▶ │  DHM server     │
-│  (agent)    │  register/report   │  server/ + SQLite│──▶ dashboard (React)
-└─────────────┘                    └─────────────────┘
-```
-
-Agents on computers report every **60 s**, on phones/Android every **5 min**
-(set in the installer — see `REPORT_INTERVAL`).
-
-## Requirements
-
-| Component | Requirement |
-|-----------|-------------|
-| Server    | Linux (Debian/Ubuntu/Fedora/RPi), Node.js ≥ 18, npm |
-| Linux agent | Node.js, npm |
-| Windows agent | Windows 10/11, Node.js LTS (the script installs it via winget) |
-| Phone | Termux + `nodejs-lts` (Android) |
-
-> All installers download the code from **GitHub Releases** — no build, no `git clone`, no `node_modules` in the repo.
-> The installers do NOT delete anything; to remove DHM use the uninstall scripts.
-
 ## Quick start
 
 ### 0. One-liner install (from GitHub)
@@ -143,6 +119,18 @@ The script: installs nodejs, downloads the agent from GitHub Releases, registers
 autostart via Termux:Boot (install "Termux:Boot" from F-Droid and open it once). Asks for
 `REPORT_INTERVAL` (default 300 s).
 
+## Requirements
+
+| Component | Requirement |
+|-----------|-------------|
+| Server    | Linux (Debian/Ubuntu/Fedora/RPi), Node.js ≥ 18, npm |
+| Linux agent | Node.js, npm |
+| Windows agent | Windows 10/11, Node.js LTS (the script installs it via winget) |
+| Phone | Termux + `nodejs-lts` (Android) |
+
+> All installers download the code from **GitHub Releases** — no build, no `git clone`, no `node_modules` in the repo.
+> The installers do NOT delete anything; to remove DHM use the uninstall scripts.
+
 ## Auto-install scripts
 
 | Platform | Script | What it does |
@@ -212,6 +200,18 @@ Device fields: `name`, `ip`, `type` (`server`/`desktop`/`laptop`/`phone`), `os_n
 ### Status codes
 `200` OK · `400` validation · `401` missing/bad token · `403` bad agent key / `register_token` ·
 `404` device not found · `429` rate limit · `503` token not configured
+
+## Architecture
+
+```
+┌─────────────┐   HTTP/WS :4000   ┌─────────────────┐
+│  devices    │ ─────────────────▶ │  DHM server     │
+│  (agent)    │  register/report   │  server/ + SQLite│──▶ dashboard (React)
+└─────────────┘                    └─────────────────┘
+```
+
+Agents on computers report every **60 s**, on phones/Android every **5 min**
+(set in the installer — see `REPORT_INTERVAL`).
 
 ## Troubleshooting
 
