@@ -26,10 +26,6 @@ Main dashboard with devices, alerts and offline panel:
 
 ![Dashboard](docs/images/dashboard.png)
 
-Device detail with charts (CPU, RAM, disk, temperature, network):
-
-![Details](docs/images/details.jpg)
-
 ## Security / access model
 - **LAN-only** — agents and the dashboard talk to the server only over your local network,
   on the chosen port (default `4000`). No cloud, no internet egress. Do not expose this port

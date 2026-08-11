@@ -26,10 +26,6 @@ Główny dashboard z urządzeniami, alertami i panelem offline:
 
 ![Dashboard](docs/images/dashboard.png)
 
-Szczegóły urządzenia z wykresami (CPU, RAM, dysk, temperatura, sieć):
-
-![Szczegóły](docs/images/details.jpg)
-
 ## Bezpieczeństwo / model dostępu
 - **Tylko LAN** — agenty i dashboard komunikują się z serwerem wyłącznie w sieci lokalnej,
   na wybranym porcie (domyślnie `4000`). Bez chmury, bez wychodzenia do internetu.
