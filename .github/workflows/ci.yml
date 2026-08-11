@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Agent dependencies
+        working-directory: agent
+        run: npm ci
+
+      - name: Dashboard build
+        working-directory: dashboard
+        run: npm ci && npm run build
+
+      - name: Shell scripts syntax check
+        run: |
+          for f in scripts/*.sh; do sh -n "$f"; done
+          echo "shell scripts OK"

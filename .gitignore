@@ -1,23 +1,23 @@
-# Zależności
+# Dependencies
 node_modules/
 
-# Sekrety i konfiguracja lokalna
+# Secrets and local config
 agent/.api_key
 server/.env
 dashboard/dist/config.js
 
-# Tokeny i klucze (na wszelki wypadek)
+# Tokens and keys (just in case)
 *token*
 *.key
 server-key.txt
 dhm-token.txt
 
-# Baza
+# Database
 server/data.db
 server/data.db-shm
 server/data.db-wal
 
-# Logi i artefakty
+# Logs and artifacts
 *.log
 *.tar.gz
 release/
@@ -25,6 +25,6 @@ release/
 # System
 .DS_Store
 
-# Edytory
+# Editors
 *.swp
 *~

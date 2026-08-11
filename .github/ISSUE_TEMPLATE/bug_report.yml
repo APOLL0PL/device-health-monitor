@@ -1,0 +1,66 @@
+name: Bug report
+description: Something's broken — tell us what
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Fill in what you can — every bit helps.
+
+  - type: input
+    id: version
+    attributes:
+      label: Which version are you on?
+      description: Tag or commit you're running (e.g. v1.1.0).
+      placeholder: v1.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Where does it happen?
+      options:
+        - Server (Debian/Ubuntu/Fedora)
+        - Agent — Linux
+        - Agent — Windows
+        - Agent — Termux (Android)
+        - Dashboard
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do and what went wrong?
+      placeholder: The agent registers fine, but no metrics show up on the dashboard.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error messages
+      description: >
+        Paste the relevant output. Server: `pm2 logs dhm-server`.
+        Agent (Linux/Termux): `pm2 logs dhm-agent`. Windows: the terminal output during install.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: OS version, phone model, network setup (e.g. AP client isolation).
+    validations:
+      required: false

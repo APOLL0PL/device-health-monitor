@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build dashboard
+        working-directory: dashboard
+        run: npm ci && npm run build
+
+      - name: Build release artifacts
+        run: ./scripts/build-release.sh
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PREV="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
+          {
+            echo "## Changes in ${TAG}"
+            echo
+            if [ -n "$PREV" ]; then
+              git log --pretty=format:'- %s' --no-merges "$PREV..HEAD"
+            else
+              git log --pretty=format:'- %s' --no-merges
+            fi
+            echo
+          } > /tmp/release-notes.md
+          echo "notes written"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: /tmp/release-notes.md
+          files: |
+            release/dhm-agent.tar.gz
+            release/dhm-bundle.tar.gz
+            scripts/serwer.sh
+            scripts/user-linux.sh
+            scripts/user-win.bat
+            scripts/setup-termux.sh
+            scripts/uninstall-linux.sh
+            scripts/uninstall-serwer.sh
+            scripts/uninstall-win.bat

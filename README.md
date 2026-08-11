@@ -2,6 +2,8 @@
 
 ![GitHub License](https://img.shields.io/github/license/APOLL0PL/device-health-monitor)
 ![GitHub top language](https://img.shields.io/github/languages/top/APOLL0PL/device-health-monitor)
+![CI](https://github.com/APOLL0PL/device-health-monitor/actions/workflows/ci.yml/badge.svg)
+![GitHub Release](https://img.shields.io/github/v/release/APOLL0PL/device-health-monitor)
 
 > **English** | [Polski](README.pl.md)
 
