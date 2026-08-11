@@ -172,7 +172,7 @@ app.post('/api/alerts/:id/resolve', limiterWrite, authWrite, (req, res) => {
 });
 
 // SPA fallback
-app.get('*', (req, res) => {
+app.get('/*splat', (req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/dist/index.html'));
 });
 
