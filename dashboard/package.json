@@ -12,7 +12,7 @@
     "lucide-react": "^1.25.0",
     "react": "^19.2.8",
     "react-dom": "^19.0.0",
-    "recharts": "^2.15.0"
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.0",
