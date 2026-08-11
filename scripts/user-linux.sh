@@ -43,6 +43,12 @@ ok()   { echo -e "${GREEN}[OK]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 fail() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 
+# ---- must NOT run as root: the agent uses a systemd USER service ----
+if [ "$(id -u)" -eq 0 ]; then
+    fail "Do not run this installer as root - the agent uses a systemd user service.
+   Run it as a normal user (no sudo needed)."
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ---- registration token: env -> prompt ----
