@@ -71,9 +71,8 @@ if %errorlevel% neq 0 (
 )
 set "PATH=%APPDATA%\npm;%PATH%"
 
-rem ---- stop the old agent ----
-pm2 kill >nul 2>nul
-taskkill /f /im node.exe >nul 2>nul
+rem ---- stop only the DHM agent (leave other node/pm2 apps alone) ----
+pm2 delete dhm-agent >nul 2>nul
 
 rem ---- get the agent code (GitHub Releases) ----
 if exist "%AGENT_DIR%\index.js" goto :have_agent
@@ -108,6 +107,7 @@ rem ---- register + start ----
 del /q "%AGENT_DIR%\.api_key" >nul 2>nul
 set "REPORT_INTERVAL=%REPORT_INTERVAL%"
 pm2 start index.js --name dhm-agent --update-env
+rem ---- saves dhm-agent AND any other apps already managed by pm2 ----
 pm2 save
 
 rem ---- autostart (all users if admin, otherwise current user) ----

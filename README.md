@@ -226,8 +226,8 @@ Agents on computers report every **60 s**, on phones/Android every **5 min**
   or write `window.DHM_CONFIG = { token: "<AUTH_TOKEN>" };` to that file.
 - **Agent logs "API key rejected, re-registering..."** — normal after a DB cleanup; the agent needs `REGISTER_TOKEN`.
 - **`npm install` fails on the server** — install `build-essential python3` (needed for `better-sqlite3`).
-- **Windows: user-win.bat clears other apps** — the script runs `taskkill /f /im node.exe` and deletes
-  `%USERPROFILE%\.pm2`. On a machine with other pm2 apps: first `pm2 save` and back up `dump.pm2`.
+- **Windows: does user-win.bat touch other apps?** — no. It only `pm2 delete dhm-agent`s the agent itself
+  (never `taskkill /f /im node.exe`, never deletes `%USERPROFILE%\.pm2`). `pm2 save` keeps any other pm2 apps.
 - **Duplicate device** — remove via `DELETE /api/devices/:id` (loopback registration without a MAC is rejected since 2026-08).
 - **Termux: no autostart** — install "Termux:Boot" from F-Droid and open it once.
 - **Temperature doesn't work on Windows** — the CPU sensor must be exposed via WMI; falls back to GPU; if absent — "—".
