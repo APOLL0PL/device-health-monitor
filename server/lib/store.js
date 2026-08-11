@@ -1,5 +1,5 @@
-const crypto = require('crypto');
-const db = require('../db');
+import crypto from 'node:crypto';
+import db from '../db.js';
 
 const THRESHOLDS = {
   disk_percent: 90,
@@ -251,7 +251,7 @@ function getDeviceSummary() {
   return { total, online, offline: total - online, activeAlerts };
 }
 
-module.exports = {
+export {
   registerDevice,
   getAllDevices,
   publicDevice,

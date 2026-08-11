@@ -1,7 +1,10 @@
-const os = require('os');
-const fs = require('fs');
-const path = require('path');
-const si = require('systeminformation');
+import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import si from 'systeminformation';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:4000';
 const DEVICE_TYPE = process.env.DEVICE_TYPE || 'server';

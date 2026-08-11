@@ -1,6 +1,6 @@
-const os = require('os');
-const si = require('systeminformation');
-const store = require('./store');
+import os from 'node:os';
+import si from 'systeminformation';
+import { getDevice, getLatestMetrics, publicDevice, recordMetrics, registerDevice } from './store.js';
 
 const INTERVAL = Number(process.env.SELF_REPORT_INTERVAL) || 60_000;
 const DEVICE_NAME = process.env.SELF_DEVICE_NAME || os.hostname();
@@ -104,7 +104,7 @@ async function getMetrics() {
 
 function ensureRegistered() {
   if (selfDeviceId) return;
-  const dev = store.registerDevice(DEVICE_NAME, getLocalIp(), 'server', os.platform(), getMac());
+  const dev = registerDevice(DEVICE_NAME, getLocalIp(), 'server', os.platform(), getMac());
   if (dev) selfDeviceId = dev.id;
 }
 
@@ -113,11 +113,11 @@ async function report(broadcast) {
     ensureRegistered();
     if (!selfDeviceId) return; // sieć jeszcze nie gotowa - ponów w następnym cyklu
     const metrics = await getMetrics();
-    store.recordMetrics(selfDeviceId, { ...metrics, ip: getLocalIp(), mac: getMac() });
-    const device = store.getDevice(selfDeviceId);
-    const latest = store.getLatestMetrics(selfDeviceId);
+    recordMetrics(selfDeviceId, { ...metrics, ip: getLocalIp(), mac: getMac() });
+    const device = getDevice(selfDeviceId);
+    const latest = getLatestMetrics(selfDeviceId);
     if (typeof broadcast === 'function') {
-      broadcast({ type: 'metrics', deviceId: selfDeviceId, metrics: latest, device: store.publicDevice(device) });
+      broadcast({ type: 'metrics', deviceId: selfDeviceId, metrics: latest, device: publicDevice(device) });
     }
   } catch (err) {
     console.error(`[self-monitor] ${err.message}`);
@@ -130,4 +130,4 @@ function start(broadcast) {
   return setInterval(() => report(broadcast), INTERVAL);
 }
 
-module.exports = { start };
+export { start };

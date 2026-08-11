@@ -251,11 +251,11 @@ device-health-monitor/
 │   ├── db.js
 │   ├── lib/store.js     ← devices, metrics, alerts (validation, loopback-fix)
 │   ├── lib/selfmonitor.js ← server self-monitoring (skips virtual interfaces)
-│   ├── lib/ratelimit.js ← simple rate limiting (zero deps)
-│   └── ecosystem.config.js
+│   ├── test/            ← node:test suite (API + WebSocket)
+│   └── ecosystem.config.cjs
 ├── agent/               ← device agent (Linux/Windows/Termux)
 │   ├── index.js         ← metrics + registration + reporting (skips virtual interfaces)
-│   └── ecosystem.config.js
+│   └── ecosystem.config.cjs
 ├── dashboard/           ← React/Vite dashboard (dist/ committed)
 │   └── src/
 ├── scripts/             ← one-liner installers:

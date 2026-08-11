@@ -1,13 +1,32 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
-const net = require('net');
-const { WebSocketServer } = require('ws');
-const http = require('http');
-const store = require('./lib/store');
-const { ipKeyGenerator, rateLimit } = require('express-rate-limit');
-const selfmonitor = require('./lib/selfmonitor');
+import express from 'express';
+import cors from 'cors';
+import path from 'node:path';
+import fs from 'node:fs';
+import http from 'node:http';
+import { fileURLToPath } from 'node:url';
+import { WebSocketServer } from 'ws';
+import { ZodError, z } from 'zod';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
+import {
+  checkOfflineDevices,
+  getActiveAlerts,
+  getAllDevices,
+  getAlert,
+  getDevice,
+  getDeviceByKey,
+  getDeviceSummary,
+  getLatestMetrics,
+  getMetrics,
+  publicDevice,
+  recordMetrics,
+  registerDevice,
+  removeDevice,
+  resolveAlert,
+  updateDeviceName,
+} from './lib/store.js';
+import { start as selfmonitorStart } from './lib/selfmonitor.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 if (fs.existsSync(path.join(__dirname, '.env'))) {
   for (const line of fs.readFileSync(path.join(__dirname, '.env'), 'utf8').split('\n')) {
@@ -20,6 +39,7 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
 const REGISTER_TOKEN = process.env.REGISTER_TOKEN || process.env.AUTH_TOKEN || '';
+const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 
 app.disable('x-powered-by');
 app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
@@ -34,6 +54,17 @@ const limiterReport = rateLimit({
   keyGenerator: (req) => req.headers['x-api-key'] || ipKeyGenerator(req.ip),
 });
 
+const registerSchema = z.object({
+  name: z.string().trim().min(1).max(64),
+  ip: z.union([z.string().trim().ipv4(), z.string().trim().ipv6()]),
+  type: z.enum(['server', 'desktop', 'laptop', 'phone', 'android', 'unknown']).default('unknown'),
+  os_name: z.string().max(32).default('unknown'),
+  mac: z.string().max(32).optional().nullable(),
+  register_token: z.string().optional(),
+});
+
+const nameSchema = z.string().trim().min(1).max(64);
+
 function authWrite(req, res, next) {
   if (!AUTH_TOKEN) {
     return res.status(503).json({ error: 'AUTH_TOKEN not configured — set it in server/.env' });
@@ -47,60 +78,48 @@ function authWrite(req, res, next) {
 function authenticateAgent(req, res, next) {
   const key = req.headers['x-api-key'];
   if (!key) return res.status(401).json({ error: 'Missing X-Api-Key header' });
-  const device = store.getDeviceByKey(key);
+  const device = getDeviceByKey(key);
   if (!device) return res.status(403).json({ error: 'Invalid API key' });
   req.device = device;
   next();
 }
 
-function cleanName(name) {
-  return typeof name === 'string' && name.trim() && name.trim().length <= 64 ? name.trim() : null;
-}
-
 // Agent endpoints
 app.post('/api/agent/register', limiterRegister, (req, res) => {
-  const { name, ip, type, os_name, mac, register_token } = req.body || {};
   if (!REGISTER_TOKEN) {
     return res.status(503).json({ error: 'REGISTER_TOKEN not configured — set it in server/.env' });
   }
-  if (register_token !== REGISTER_TOKEN) {
+  const body = registerSchema.parse(req.body || {});
+  if (body.register_token !== REGISTER_TOKEN) {
     return res.status(403).json({ error: 'Invalid register token' });
   }
-  if (!cleanName(name)) {
-    return res.status(400).json({ error: 'name invalid' });
-  }
-  if (typeof ip !== 'string' || net.isIP(ip.trim()) === 0) {
-    return res.status(400).json({ error: 'ip invalid' });
-  }
-  const types = ['server', 'desktop', 'laptop', 'phone', 'android', 'unknown'];
-  const deviceType = types.includes(type) ? type : 'unknown';
-  const device = store.registerDevice(
-    cleanName(name),
-    ip.trim(),
-    deviceType,
-    typeof os_name === 'string' ? os_name.slice(0, 32) : 'unknown',
-    typeof mac === 'string' ? mac.slice(0, 32) : null
+  const device = registerDevice(
+    body.name,
+    body.ip,
+    body.type,
+    body.os_name,
+    body.mac || null
   );
   if (!device) {
     return res.status(409).json({ error: 'No reliable identity (IP loopback without MAC)' });
   }
-  broadcast({ type: 'device_update', device: store.publicDevice(store.getDevice(device.id)) });
+  broadcast({ type: 'device_update', device: publicDevice(getDevice(device.id)) });
   res.json(device);
 });
 
 app.post('/api/agent/report', limiterReport, authenticateAgent, (req, res) => {
-  store.recordMetrics(req.device.id, req.body || {});
-  const device = store.getDevice(req.device.id);
-  const metrics = store.getLatestMetrics(req.device.id);
-  broadcast({ type: 'metrics', deviceId: req.device.id, metrics, device: store.publicDevice(device) });
+  recordMetrics(req.device.id, req.body || {});
+  const device = getDevice(req.device.id);
+  const metrics = getLatestMetrics(req.device.id);
+  broadcast({ type: 'metrics', deviceId: req.device.id, metrics, device: publicDevice(device) });
   res.json({ ok: true });
 });
 
 // Dashboard endpoints (read-only, open dashboard)
 app.get('/api/devices', (req, res) => {
-  const devices = store.getAllDevices().map((d) => {
-    const device = store.publicDevice(d);
-    const m = store.getLatestMetrics(device.id);
+  const devices = getAllDevices().map((d) => {
+    const device = publicDevice(d);
+    const m = getLatestMetrics(device.id);
     return {
       ...device,
       last_cpu: m?.cpu_percent ?? null,
@@ -120,59 +139,58 @@ app.get('/api/devices', (req, res) => {
       mac: d.mac ?? null,
     };
   });
-  const summary = store.getDeviceSummary();
+  const summary = getDeviceSummary();
   res.json({ devices, summary });
 });
 
 app.get('/api/devices/:id', (req, res) => {
-  const row = store.getDevice(Number(req.params.id));
+  const row = getDevice(Number(req.params.id));
   if (!row) return res.status(404).json({ error: 'Not found' });
-  const device = store.publicDevice(row);
-  const metrics = store.getLatestMetrics(device.id);
+  const device = publicDevice(row);
+  const metrics = getLatestMetrics(device.id);
   res.json({ device, metrics });
 });
 
 app.get('/api/devices/:id/metrics', (req, res) => {
   const raw = Number(req.query.hours);
   const hours = Number.isFinite(raw) ? Math.min(720, Math.max(1, raw)) : 24;
-  const metrics = store.getMetrics(Number(req.params.id), hours);
+  const metrics = getMetrics(Number(req.params.id), hours);
   res.json({ metrics });
 });
 
 app.get('/api/alerts', (req, res) => {
-  res.json({ alerts: store.getActiveAlerts() });
+  res.json({ alerts: getActiveAlerts() });
 });
 
 app.get('/api/summary', (req, res) => {
-  res.json(store.getDeviceSummary());
+  res.json(getDeviceSummary());
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, uptime: process.uptime(), version: require('./package.json').version || null });
+  res.json({ ok: true, uptime: process.uptime(), version: PKG.version || null });
 });
 
 // Write endpoints (require X-Auth-Token)
 app.patch('/api/devices/:id', limiterWrite, authWrite, (req, res) => {
   const id = Number(req.params.id);
-  if (!store.getDevice(id)) return res.status(404).json({ error: 'Not found' });
-  const name = cleanName(req.body?.name);
-  if (!name) return res.status(400).json({ error: 'name invalid' });
-  store.updateDeviceName(id, name);
-  res.json({ ok: true, device: store.getDevice(id) });
+  if (!getDevice(id)) return res.status(404).json({ error: 'Not found' });
+  const name = nameSchema.parse(req.body?.name);
+  updateDeviceName(id, name);
+  res.json({ ok: true, device: publicDevice(getDevice(id)) });
 });
 
 app.delete('/api/devices/:id', limiterWrite, authWrite, (req, res) => {
   const id = Number(req.params.id);
-  if (!store.getDevice(id)) return res.status(404).json({ error: 'Not found' });
-  store.removeDevice(id);
+  if (!getDevice(id)) return res.status(404).json({ error: 'Not found' });
+  removeDevice(id);
   broadcast({ type: 'device_removed', deviceId: id });
   res.json({ ok: true });
 });
 
 app.post('/api/alerts/:id/resolve', limiterWrite, authWrite, (req, res) => {
   const id = Number(req.params.id);
-  if (!store.getAlert(id)) return res.status(404).json({ error: 'Not found' });
-  store.resolveAlert(id);
+  if (!getAlert(id)) return res.status(404).json({ error: 'Not found' });
+  resolveAlert(id);
   broadcast({ type: 'alerts' });
   res.json({ ok: true });
 });
@@ -187,6 +205,9 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
+  if (err instanceof ZodError) {
+    return res.status(400).json({ error: 'invalid payload', details: err.issues });
+  }
   console.error(`[error] ${req.method} ${req.originalUrl}:`, err.message || err);
   res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
@@ -211,12 +232,12 @@ function broadcast(data) {
 }
 
 const summaryTimer = setInterval(() => {
-  store.checkOfflineDevices();
-  const summary = store.getDeviceSummary();
+  checkOfflineDevices();
+  const summary = getDeviceSummary();
   broadcast({ type: 'summary', summary });
 }, 60_000);
 
-const selfTimer = selfmonitor.start(broadcast);
+const selfTimer = selfmonitorStart(broadcast);
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Device Health Monitor server on http://0.0.0.0:${PORT}`);
@@ -228,4 +249,4 @@ function shutdown() {
   server.close();
 }
 
-module.exports = { server, shutdown };
+export { server, shutdown };

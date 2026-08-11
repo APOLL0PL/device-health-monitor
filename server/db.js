@@ -1,5 +1,8 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+import Database from 'better-sqlite3';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const db = new Database(process.env.DB_PATH || path.join(__dirname, 'data.db'));
 
@@ -60,4 +63,4 @@ db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_mac ON devices(mac) WHERE
 try { db.exec("ALTER TABLE alerts ADD COLUMN type TEXT NOT NULL DEFAULT 'threshold'"); } catch {}
 db.exec("DELETE FROM alerts WHERE type = 'device_offline'");
 
-module.exports = db;
+export default db;

@@ -1,8 +1,8 @@
-const { test, before, after } = require('node:test');
-const assert = require('node:assert');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+import { test, before, after } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dhm-test-'));
 process.env.DB_PATH = path.join(tmpDir, 'test.db');
@@ -10,8 +10,8 @@ process.env.PORT = '4099';
 process.env.AUTH_TOKEN = 'test-auth';
 process.env.REGISTER_TOKEN = 'test-register';
 
-const { WebSocket } = require('ws');
-const { server, shutdown } = require('../index.js');
+const { WebSocket } = await import('ws');
+const { server, shutdown } = await import('../index.js');
 
 const BASE = 'http://127.0.0.1:4099';
 
@@ -41,12 +41,23 @@ test('register device', async () => {
   assert.ok(body.id, 'register returns device id');
   registeredKey = body.api_key;
   registeredId = body.id;
-  assert.equal(body.api_key, registeredKey);
 });
 
 test('register rejects wrong token', async () => {
   const res = await register('bad', 'wrong-token');
   assert.equal(res.status, 403);
+});
+
+test('register rejects invalid payload', async () => {
+  const res = await fetch(`${BASE}/api/agent/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: '', ip: 'not-an-ip', register_token: 'test-register' }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error, 'invalid payload');
+  assert.ok(Array.isArray(body.details) && body.details.length > 0);
 });
 
 test('api/devices never exposes api_key', async () => {
@@ -80,11 +91,9 @@ test('WS broadcasts do not leak api_key', async () => {
     ws.once('error', reject);
   });
 
-  const seen = [];
   const gotMetrics = new Promise((resolve) => {
     ws.on('message', (data) => {
       const msg = JSON.parse(data.toString());
-      seen.push(msg);
       if (msg.type === 'metrics' && msg.deviceId === registeredId) resolve(msg);
     });
   });
