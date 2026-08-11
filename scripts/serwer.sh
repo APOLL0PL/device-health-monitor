@@ -3,35 +3,27 @@
 # DHM SERVER - auto-setup (Debian/Ubuntu/Fedora/Arch/RPi)
 #
 # Installs the DHM server + dashboard, starts it under pm2 and enables
-# autostart (systemd). Also starts the LAN install-file server (:9999)
-# used by the agent installers.
+# autostart (systemd).
 #
-# Works fully offline on the LAN (local tarball next to this script).
-# When no local copy exists - e.g. when run via the one-liner from the
-# README - it downloads the bundle from GitHub Releases automatically.
+# Designed to be run as a ONE-LINER (from the README) - it downloads the
+# code from GitHub Releases automatically. The installer does NOT delete
+# anything; to remove DHM use scripts/uninstall-serwer.sh.
 #
-# Where the code comes from (first match wins):
+# Where the code comes from:
 #   1. INSTALL_DIR already contains server/index.js  -> used as-is
-#   2. dhm-bundle.tar.gz next to this script          -> extracted
-#   3. GitHub Releases (dhm-bundle.tar.gz)            -> downloaded
-# After a fresh install the script cleans up (removes the bundle + .git).
+#   2. GitHub Releases (dhm-bundle.tar.gz)            -> downloaded
 #
 # Variables (optionally set before running):
 #   INSTALL_DIR     install dir (default: $HOME/device-health-monitor)
-#   BUNDLE          path to the code bundle (default: next to this script)
+#   GITHUB_URL      bundle download URL (GitHub Releases by default)
 #   PORT            server port (default: 4000)
 #   AUTH_TOKEN      dashboard write token (optional, generated if empty)
 #   REGISTER_TOKEN  registration token (optional, generated if empty)
-#   DHM_INSTALL_DIR dir with installer files served by dhm-serve
-#                   (default: /mnt/storage/media/DHM)
 #   PM2_NAME        pm2 process name of the server (default: dhm-server)
-#   SERVE_PORT      LAN install-file server port (default: 9999)
-#   PM2_SERVE_NAME  pm2 process name of the LAN file server (default: dhm-serve)
 #
 # For a SECOND instance on the same machine: give it a different INSTALL_DIR,
 # PORT and PM2_NAME (e.g. INSTALL_DIR=$HOME/dhm-test PORT=4001
-# PM2_NAME=dhm-server-test). dhm-serve is skipped if SERVE_PORT is already
-# in use (the first instance keeps serving the install files).
+# PM2_NAME=dhm-server-test).
 #
 # Example:
 #   ./serwer.sh
@@ -40,15 +32,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/device-health-monitor}"
-BUNDLE="${BUNDLE:-$SCRIPT_DIR/dhm-bundle.tar.gz}"
 GITHUB_URL="${GITHUB_URL:-https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/dhm-bundle.tar.gz}"
 PORT="${PORT:-}"
 AUTH_TOKEN="${AUTH_TOKEN:-}"
 REGISTER_TOKEN="${REGISTER_TOKEN:-}"
-DHM_INSTALL_DIR="${DHM_INSTALL_DIR:-/mnt/storage/media/DHM}"
 PM2_NAME="${PM2_NAME:-dhm-server}"
-SERVE_PORT="${SERVE_PORT:-9999}"
-PM2_SERVE_NAME="${PM2_SERVE_NAME:-dhm-serve}"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 ok()   { echo -e "${GREEN}[OK]${NC} $*"; }
@@ -115,29 +103,20 @@ command -v npm  >/dev/null 2>&1 || fail "npm not found after install"
 command -v curl >/dev/null 2>&1 || fail "curl not found after install"
 ok "Node.js $(node --version)"
 
-# --- Get the code (offline on LAN, GitHub Releases as fallback) ---
-# Priority: 1) existing install, 2) bundle next to script, 3) GitHub.
+# --- Get the code (GitHub Releases) ---
 if [ -f "$INSTALL_DIR/server/index.js" ]; then
-    warn "DHM server files already present in $INSTALL_DIR - using them."
-elif [ -f "$BUNDLE" ]; then
-    warn "Extracting code from $BUNDLE ..."
-    mkdir -p "$INSTALL_DIR"
-    tar xzf "$BUNDLE" -C "$INSTALL_DIR" --strip-components=1
-    # mark that this was a fresh install -> clean up the bundle afterwards
-    CLEANUP_BUNDLE=1
+    warn "DHM server files already present in $INSTALL_DIR - using them (no download)."
 else
-    mkdir -p "$(dirname "$INSTALL_DIR")"
-    warn "No local bundle found - downloading from GitHub Releases..."
+    mkdir -p "$INSTALL_DIR"
+    warn "Downloading DHM server bundle from GitHub Releases..."
     TMP_DL="$(mktemp)"
     if ! curl -fsSL --max-time 120 "$GITHUB_URL" -o "$TMP_DL" 2>/dev/null; then
         rm -f "$TMP_DL"
-        fail "Could not download the DHM bundle from GitHub.
-   Check the internet connection / GITHUB_URL, or put dhm-bundle.tar.gz
-   next to this script (or make $INSTALL_DIR/server/index.js exist)."
+        fail "Could not download the DHM bundle from $GITHUB_URL.
+   Check the internet connection / GITHUB_URL."
     fi
     tar xzf "$TMP_DL" -C "$INSTALL_DIR" --strip-components=1
     rm -f "$TMP_DL"
-    CLEANUP_BUNDLE=1
 fi
 [ -f "$INSTALL_DIR/server/index.js" ] || fail "DHM server files missing in $INSTALL_DIR/server (index.js not found)."
 
@@ -193,29 +172,10 @@ pm2 start index.js --name "$PM2_NAME"
 pm2 save
 ok "Server started (pm2 name: $PM2_NAME)."
 
-# --- LAN install-file server (:9999) ---
-if [ -f "$INSTALL_DIR/server/serve-install.js" ]; then
-    if port_in_use "$SERVE_PORT"; then
-        warn "Port $SERVE_PORT (LAN install-file server) is already IN USE - skipping dhm-serve."
-        warn "The existing instance already serves the install files on :$SERVE_PORT."
-    else
-        ok "Starting LAN install-file server ($PM2_SERVE_NAME :$SERVE_PORT)..."
-        (cd "$INSTALL_DIR/server" && DHM_INSTALL_DIR="$DHM_INSTALL_DIR" DHM_SERVE_PORT="$SERVE_PORT" pm2 start serve-install.js --name "$PM2_SERVE_NAME")
-        pm2 save
-    fi
-    if [ ! -d "$DHM_INSTALL_DIR" ]; then
-        warn "DHM_INSTALL_DIR ($DHM_INSTALL_DIR) does not exist yet - create it and put
-       dhm-agent.tar.gz, user-win.bat, user-linux.sh, dhm-token.txt in it."
-    fi
-else
-    warn "serve-install.js missing - the LAN file server on :$SERVE_PORT was NOT started."
-fi
-
 # --- Firewall ---
 if command -v ufw >/dev/null 2>&1; then
     ok "Opening ports in UFW..."
     sudo ufw allow "$PORT_FINAL"/tcp || true
-    sudo ufw allow "$SERVE_PORT"/tcp || true
 fi
 
 # --- Autostart after reboot ---
@@ -223,18 +183,6 @@ if [ -d /run/systemd/system ] || [ -d /etc/systemd ]; then
     warn "Enabling systemd autostart for pm2 (may ask for sudo)..."
     sudo env "PATH=$PATH" pm2 startup systemd -u "$USER" --hp "$HOME" \
         || warn "Autostart NOT enabled - run manually: sudo env PATH=\$PATH pm2 startup systemd -u $USER --hp $HOME"
-fi
-
-# --- Cleanup (remove things not needed to run) ---
-if [ "${CLEANUP_BUNDLE:-0}" = "1" ]; then
-    warn "Cleaning up - removing .git from $INSTALL_DIR ..."
-    rm -rf "$INSTALL_DIR/.git" 2>/dev/null || true
-    if [ -f "$BUNDLE" ]; then
-        warn "Removing bundle $BUNDLE (not needed - server is installed) ..."
-        rm -f "$BUNDLE" 2>/dev/null || true
-    fi
-else
-    warn "Using existing files - keeping .git and bundle."
 fi
 
 echo
@@ -245,10 +193,13 @@ LAN_IP="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i==
 echo "Dashboard:   http://${LAN_IP:-<server-IP>}:$PORT_FINAL"
 echo "Logs:        pm2 logs $PM2_NAME"
 echo
-echo "Agents:      run scripts/user-win.bat (Windows) or scripts/user-linux.sh (Linux)"
+echo "Agents (one-liners from the README):"
+echo "  Linux:    curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && REGISTER_TOKEN=$REGISTER_TOKEN_FINAL sh /tmp/dhm.sh"
+echo "  Windows:  curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && %TEMP%\user-win.bat"
+echo "  Phone:    pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=$REGISTER_TOKEN_FINAL sh /tmp/setup-dhm.sh"
+echo
 echo "REGISTER_TOKEN: $REGISTER_TOKEN_FINAL"
 echo "             (keep it secret - agents need it only for the first registration)"
 echo
-echo "Remove this instance: pm2 delete $PM2_NAME && rm -rf \"$INSTALL_DIR\" && pm2 save"
-echo "             (plus: sudo ufw delete allow $PORT_FINAL/tcp)"
+echo "Remove DHM:  scripts/uninstall-serwer.sh"
 echo

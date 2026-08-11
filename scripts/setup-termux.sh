@@ -12,23 +12,19 @@
 #
 # Variables:
 #   SERVER_URL      DHM server address (default: auto-detect local IP)
-#   SERVE_URL       address of the install-file server (default: :9999 on the same IP)
-#   GITHUB_URL      agent tarball on GitHub Releases (fallback download)
+#   GITHUB_URL      agent tarball on GitHub Releases
 #   DEVICE_NAME     name on the dashboard (default: phone model)
 #   REPORT_INTERVAL report interval in seconds (default: 300 = 5 min)
 #   REGISTER_TOKEN  registration token from the server/server/.env
-#   SERVER_USER     SSH user on the server (for the scp fallback; default: user)
 # ============================================================================
 set -e
 
 SERVER_URL="${SERVER_URL:-}"
-SERVE_URL="${SERVE_URL:-}"
 GITHUB_URL="${GITHUB_URL:-https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/dhm-agent.tar.gz}"
 DEVICE_NAME="${DEVICE_NAME:-$(getprop ro.product.model 2>/dev/null || echo 'Phone')}"
 DEVICE_TYPE=phone
 REPORT_INTERVAL="${REPORT_INTERVAL:-}"
 REGISTER_TOKEN="${REGISTER_TOKEN:-}"
-SERVER_USER="${SERVER_USER:-user}"
 
 INSTALL_DIR="$HOME/dhm-agent"
 AGENT_TAR="$HOME/dhm-agent.tar.gz"
@@ -61,12 +57,6 @@ if [ -z "$SERVER_URL" ]; then
   fi
 fi
 
-# --- Install-file server: same host, port 9999 ---
-if [ -z "$SERVE_URL" ]; then
-  SRV_IP="$(echo "$SERVER_URL" | sed 's|^http://||; s|:.*$||')"
-  SERVE_URL="http://$SRV_IP:9999"
-fi
-
 echo "=== DHM Agent — Termux ==="
 echo "Server:     $SERVER_URL"
 echo "Device:     $DEVICE_NAME (phone)"
@@ -89,19 +79,16 @@ if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
   pkg install -y nodejs-lts
 fi
 
-# --- Download the agent (LAN :9999 -> GitHub Releases -> scp) ---
+# --- Download the agent (GitHub Releases) ---
 mkdir -p "$INSTALL_DIR"
 echo "Downloading the agent..."
-if ! curl -fsSL --max-time 10 "$SERVE_URL/dhm-agent.tar.gz" -o "$AGENT_TAR" 2>/dev/null; then
-  echo "  (fallback: GitHub Releases...)"
-  if ! curl -fsSL --max-time 120 "$GITHUB_URL" -o "$AGENT_TAR" 2>/dev/null; then
-    echo "  (fallback: scp from the server...)"
-    command -v scp >/dev/null 2>&1 || pkg install -y openssh
-    scp -o StrictHostKeyChecking=no "$SERVER_USER@$SRV_IP:/mnt/storage/media/DHM/dhm-agent.tar.gz" "$AGENT_TAR"
-  fi
+if ! curl -fsSL --max-time 120 "$GITHUB_URL" -o "$AGENT_TAR" 2>/dev/null; then
+  echo "Could not download the agent from $GITHUB_URL"
+  echo "Check the internet connection / GITHUB_URL."
+  exit 1
 fi
 tar xzf "$AGENT_TAR" -C "$INSTALL_DIR"
-rm -f "$AGENT_TAR" "$INSTALL_DIR/.api_key"
+rm -f "$AGENT_TAR"
 
 # --- Agent dependencies ---
 cd "$INSTALL_DIR"

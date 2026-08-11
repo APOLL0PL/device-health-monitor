@@ -9,40 +9,30 @@ rem
 rem  Installs the DHM agent on this PC, registers the device with
 rem  the DHM server and enables autostart (after login).
 rem
-rem  Fully self-contained on the LAN (local tarball / :9999 / Samba). When
-rem  no local copy exists - e.g. when run via the one-liner from the README -
-rem  it downloads the agent from GitHub Releases automatically.
-rem  Where the agent code comes from (first match wins):
+rem  Designed to be run as a ONE-LINER (from the README) - it downloads
+rem  the agent from GitHub Releases automatically. The installer does NOT
+rem  delete anything; to remove the agent use scripts/uninstall-win.bat.
+rem  Where the agent code comes from:
 rem    1) existing folder C:\agent           -> used as-is
-rem    2) dhm-agent.tar.gz next to this .bat -> extracted
-rem    3) LAN file server  (:9999)           -> downloaded
-rem    4) Samba share      (\\server\NAS\media\DHM)
-rem    5) GitHub Releases  (dhm-agent.tar.gz)
-rem  After the install the downloaded tarball is removed.
+rem    2) GitHub Releases  (dhm-agent.tar.gz)
 rem
 rem  Variables (set before running):
 rem    SERVER_URL      DHM server        (default: http://192.168.0.10:4000)
-rem    SERVE_URL       file server       (default: http://192.168.0.10:9999)
 rem    DEVICE_NAME     dashboard name    (default: %COMPUTERNAME%)
 rem    DEVICE_TYPE     desktop|laptop    (default: desktop)
 rem    REPORT_INTERVAL report interval   (default: 60 s)
-rem    REGISTER_TOKEN  registration token (or dhm-token.txt next to this
-rem                     script, or interactive prompt)
+rem    REGISTER_TOKEN  registration token (or interactive prompt)
 rem ============================================================
 
 if "%SERVER_URL%"=="" set "SERVER_URL=http://192.168.0.10:4000"
-if "%SERVE_URL%"=="" set "SERVE_URL=http://192.168.0.10:9999"
-if "%SMB_TAR%"=="" set "SMB_TAR=\\192.168.0.10\NAS\media\DHM\dhm-agent.tar.gz"
 if "%GITHUB_TAR%"=="" set "GITHUB_TAR=https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/dhm-agent.tar.gz"
 set "AGENT_DIR=C:\agent"
 set "AGENT_TAR=%TEMP%\dhm-agent.tar.gz"
-set "LOCAL_TAR=%~dp0dhm-agent.tar.gz"
 
 if "%DEVICE_NAME%"=="" set "DEVICE_NAME=%COMPUTERNAME%"
 if "%DEVICE_TYPE%"=="" set "DEVICE_TYPE=desktop"
 
-rem ---- registration token: env -> dhm-token.txt (LAN) -> prompt ----
-if "%REGISTER_TOKEN%"=="" if exist "%~dp0dhm-token.txt" set /p REGISTER_TOKEN=<"%~dp0dhm-token.txt"
+rem ---- registration token: env -> prompt ----
 if "%REGISTER_TOKEN%"=="" set /p "REGISTER_TOKEN=Registration token (REGISTER_TOKEN from server/.env): "
 if "%REGISTER_TOKEN%"=="" (
     echo ERROR: no registration token - get it from server/.env on the DHM server.
@@ -85,35 +75,21 @@ rem ---- stop the old agent ----
 pm2 kill >nul 2>nul
 taskkill /f /im node.exe >nul 2>nul
 
-rem ---- get the agent code (offline on LAN, GitHub Releases as fallback) ----
+rem ---- get the agent code (GitHub Releases) ----
 if exist "%AGENT_DIR%\index.js" goto :have_agent
 rmdir /s /q "%AGENT_DIR%" >nul 2>nul
 mkdir "%AGENT_DIR%" >nul 2>nul
 
-if exist "%LOCAL_TAR%" (
-    echo Extracting agent from %LOCAL_TAR% ...
-    tar xf "%LOCAL_TAR%" -C "%AGENT_DIR%"
-    if exist "%AGENT_DIR%\index.js" goto :have_agent
-    echo   local archive invalid - trying the LAN server.
-)
 del "%AGENT_TAR%" >nul 2>nul
 echo Downloading the agent...
-curl -fsSL --max-time 10 "%SERVE_URL%/dhm-agent.tar.gz" -o "%AGENT_TAR%" >nul 2>nul
-if not exist "%AGENT_TAR%" (
-    echo   fallback: Samba
-    copy /Y "%SMB_TAR%" "%AGENT_TAR%" >nul 2>nul
-)
-if not exist "%AGENT_TAR%" (
-    echo   fallback: GitHub Releases
-    curl -fsSL --max-time 60 "%GITHUB_TAR%" -o "%AGENT_TAR%" >nul 2>nul
-)
+curl -fsSL --max-time 60 "%GITHUB_TAR%" -o "%AGENT_TAR%" >nul 2>nul
 if exist "%AGENT_TAR%" (
     tar xf "%AGENT_TAR%" -C "%AGENT_DIR%"
     del "%AGENT_TAR%" >nul 2>nul
 )
 :have_agent
 if not exist "%AGENT_DIR%\index.js" (
-    echo ERROR: agent files missing - check the download sources.
+    echo ERROR: agent files missing - check the download source.
     pause
     exit /b 1
 )

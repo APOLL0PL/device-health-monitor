@@ -59,11 +59,8 @@ Agents on computers report every **60 s**, on phones/Android every **5 min**
 | Windows agent | Windows 10/11, Node.js LTS (the script installs it via winget) |
 | Phone | Termux + `nodejs-lts` (Android) |
 
-> Installation is **self-contained** — no GitHub or internet access needed on the LAN.
-> Scripts get the code from: `dhm-bundle.tar.gz` / `dhm-agent.tar.gz` next to the script,
-> or from the LAN file server (`:9999`).
-> **Outside your LAN** (one-liner installs below) they automatically fall back to
-> downloading the code from **GitHub Releases**.
+> All installers download the code from **GitHub Releases** — no build, no `git clone`, no `node_modules` in the repo.
+> The installers do NOT delete anything; to remove DHM use the uninstall scripts.
 
 ## Quick start
 
@@ -106,13 +103,13 @@ Node.js if missing and configures autostart. All code comes from
 ./scripts/serwer.sh
 ```
 
-The script: installs Node (if missing), extracts `dhm-bundle.tar.gz` to `~/device-health-monitor`,
-installs dependencies, **generates tokens** (`server/.env` + `dashboard/dist/config.js`),
-starts the server under pm2 (`dhm-server` :4000) + the install-file server (`dhm-serve` :9999,
-optional — skipped when the port is busy), opens ports in UFW and enables autostart (systemd).
+The script: installs Node (if missing), downloads `dhm-bundle.tar.gz` from GitHub Releases
+and extracts it to `~/device-health-monitor`, installs dependencies,
+**generates tokens** (`server/.env` + `dashboard/dist/config.js`),
+starts the server under pm2 (`dhm-server` :4000), opens ports in UFW and enables autostart (systemd).
 Dashboard: `http://<server-IP>:4000` — no login.
 
-Useful variables: `PORT`, `AUTH_TOKEN`, `REGISTER_TOKEN`, `DHM_INSTALL_DIR`, `PM2_NAME` (see script header).
+Useful variables: `PORT`, `AUTH_TOKEN`, `REGISTER_TOKEN`, `PM2_NAME` (see script header).
 
 ### 2. Agent — Linux
 
@@ -122,10 +119,9 @@ Useful variables: `PORT`, `AUTH_TOKEN`, `REGISTER_TOKEN`, `DHM_INSTALL_DIR`, `PM
 SERVER_URL=http://192.168.0.10:4000 DEVICE_NAME=Laptop DEVICE_TYPE=laptop ./scripts/user-linux.sh
 ```
 
-The script asks for `REPORT_INTERVAL` (default 60 s), fetches the agent
-(local tar / bundle / LAN `:9999` / GitHub Releases),
+The script asks for `REPORT_INTERVAL` (default 60 s), downloads the agent from GitHub Releases,
 installs dependencies, registers the device and configures autostart (systemd user unit + linger).
-Registration token: `REGISTER_TOKEN=<token>` (or `dhm-token.txt` next to the script).
+Registration token: `REGISTER_TOKEN=<token>`.
 
 ### 3. Agent — Windows
 
@@ -133,7 +129,7 @@ Registration token: `REGISTER_TOKEN=<token>` (or `dhm-token.txt` next to the scr
 user-win.bat
 ```
 
-Installs Node LTS (winget) and pm2, fetches the agent (local tar / LAN `:9999` / Samba / GitHub Releases),
+Installs Node LTS (winget) and pm2, downloads the agent from GitHub Releases,
 installs dependencies, registers and enables autostart (Startup folder). Asks for `REPORT_INTERVAL`.
 Registration token: `set REGISTER_TOKEN=<token>` before running.
 Removal: `uninstall-win.bat`.
@@ -141,27 +137,21 @@ Removal: `uninstall-win.bat`.
 ### 4. Agent — phone (Termux, Android)
 
 ```bash
-pkg install -y curl
-curl -fsSL http://<server-IP>:9999/setup-termux.sh -o /tmp/setup-dhm.sh
-REGISTER_TOKEN=<token> sh /tmp/setup-dhm.sh
+pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=<token> sh /tmp/setup-dhm.sh
 ```
 
-The script: installs nodejs, downloads the agent, registers it, starts it and configures
+The script: installs nodejs, downloads the agent from GitHub Releases, registers it, starts it and configures
 autostart via Termux:Boot (install "Termux:Boot" from F-Droid and open it once). Asks for
 `REPORT_INTERVAL` (default 300 s).
-
-Manual install (no file server): extract `dhm-agent.tar.gz` on the device and run
-`SERVER_URL=http://<server-IP>:4000 DEVICE_NAME=<name> node index.js` (variables — see `.env.example`).
 
 ## Auto-install scripts
 
 | Platform | Script | What it does |
 |----------|--------|--------------|
-| Server (Linux) | `scripts/serwer.sh` | extracts bundle, generates tokens, starts under pm2 (server + files `:9999`), UFW, systemd autostart |
-| Agent (Linux) | `scripts/user-linux.sh` | fetches the agent, installs dependencies, registers, systemd autostart + linger |
+| Server (Linux) | `scripts/serwer.sh` | downloads the bundle, generates tokens, starts under pm2, UFW, systemd autostart |
+| Agent (Linux) | `scripts/user-linux.sh` | downloads the agent, installs dependencies, registers, systemd autostart + linger |
 | Agent (Windows) | `scripts/user-win.bat` | winget Node, pm2, registration, autostart (Startup) |
 | Agent (Termux) | `scripts/setup-termux.sh` | one-liner: downloads the agent, registers, Termux:Boot autostart |
-| Install files | `server/serve-install.js` | serves tarball + scripts on the LAN (`:9999`) |
 | Remove (server) | `scripts/uninstall-serwer.sh` | removes pm2 + directory + UFW rules |
 | Remove (Linux) | `scripts/uninstall-linux.sh` | removes systemd service + agent directory |
 | Remove (Windows) | `scripts/uninstall-win.bat` | removes pm2 + autostart + directory |
@@ -250,7 +240,6 @@ device-health-monitor/
 ├── server/              ← HTTP + WebSocket + SQLite server
 │   ├── index.js         ← API + auth + rate limit + WebSocket
 │   ├── db.js
-│   ├── serve-install.js ← install-file server (LAN :9999)
 │   ├── lib/store.js     ← devices, metrics, alerts (validation, loopback-fix)
 │   ├── lib/selfmonitor.js ← server self-monitoring (skips virtual interfaces)
 │   ├── lib/ratelimit.js ← simple rate limiting (zero deps)
@@ -260,8 +249,8 @@ device-health-monitor/
 │   └── ecosystem.config.js
 ├── dashboard/           ← React/Vite dashboard (dist/ committed)
 │   └── src/
-├── scripts/             ← auto-setup:
-│   ├── serwer.sh        ← server (+ dhm-serve :9999)
+├── scripts/             ← one-liner installers:
+│   ├── serwer.sh        ← server
 │   ├── user-linux.sh    ← Linux agent
 │   ├── user-win.bat     ← Windows agent
 │   ├── setup-termux.sh  ← phone agent (Termux)

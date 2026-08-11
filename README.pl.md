@@ -59,10 +59,8 @@ Agent na komputerach raportuje co **60 s**, na telefonach/Androida co **5 min**
 | Agent Windows | Windows 10/11, Node.js LTS (skrypt doinstaluje przez winget) |
 | Telefon | Termux + `nodejs-lts` (Android) |
 
-> Instalacja jest **samowystarczalna** na LAN-ie — nie potrzebuje dostępu do GitHub ani internetu.
-> Skrypty biorą kod z: lokalnego `dhm-bundle.tar.gz` / `dhm-agent.tar.gz` obok skryptu,
-> albo z serwera plików LAN (`:9999`).
-> **Poza LAN-em** (1-linery poniżej) automatycznie pobierają kod z **GitHub Releases**.
+> Wszystkie instalatory pobierają kod z **GitHub Releases** — bez buildowania, bez `git clone`,
+> bez `node_modules` w repo. Instalatory NIE kasują niczego; do usunięcia DHM służą skrypty uninstall.
 
 ## Szybki start
 
@@ -105,13 +103,13 @@ i bez `git clone`.
 ./scripts/serwer.sh
 ```
 
-Skrypt: instaluje Node (jeśli brak), rozpakowuje `dhm-bundle.tar.gz` do `~/device-health-monitor`,
-instaluje zależności, **generuje tokeny** (`server/.env` + `dashboard/dist/config.js`),
-startuje serwer pod pm2 (`dhm-server` :4000) + serwer plików instalacyjnych (`dhm-serve` :9999,
-opcjonalny — pomijany, gdy port zajęty), otwiera porty w UFW i włącza autostart (systemd).
+Skrypt: instaluje Node (jeśli brak), pobiera `dhm-bundle.tar.gz` z GitHub Releases
+i rozpakowuje do `~/device-health-monitor`, instaluje zależności,
+**generuje tokeny** (`server/.env` + `dashboard/dist/config.js`),
+startuje serwer pod pm2 (`dhm-server` :4000), otwiera porty w UFW i włącza autostart (systemd).
 Dashboard: `http://<IP-serwera>:4000` — bez logowania.
 
-Użyteczne zmienne: `PORT`, `AUTH_TOKEN`, `REGISTER_TOKEN`, `DHM_INSTALL_DIR`, `PM2_NAME` (patrz nagłówek skryptu).
+Użyteczne zmienne: `PORT`, `AUTH_TOKEN`, `REGISTER_TOKEN`, `PM2_NAME` (patrz nagłówek skryptu).
 
 ### 2. Agent — Linux
 
@@ -121,10 +119,9 @@ Użyteczne zmienne: `PORT`, `AUTH_TOKEN`, `REGISTER_TOKEN`, `DHM_INSTALL_DIR`, `
 SERVER_URL=http://192.168.0.10:4000 DEVICE_NAME=Laptop DEVICE_TYPE=laptop ./scripts/user-linux.sh
 ```
 
-Skrypt pyta o `REPORT_INTERVAL` (default 60 s), pobiera agenta
-(lokalny tar / bundle / LAN `:9999` / GitHub Releases),
+Skrypt pyta o `REPORT_INTERVAL` (default 60 s), pobiera agenta z GitHub Releases,
 instaluje zależności, rejestruje urządzenie i konfiguruje autostart (systemd user unit + linger).
-Token rejestracji: `REGISTER_TOKEN=<token>` (lub `dhm-token.txt` obok skryptu).
+Token rejestracji: `REGISTER_TOKEN=<token>`.
 
 ### 3. Agent — Windows
 
@@ -132,7 +129,7 @@ Token rejestracji: `REGISTER_TOKEN=<token>` (lub `dhm-token.txt` obok skryptu).
 user-win.bat
 ```
 
-Instaluje Node LTS (winget) i pm2, pobiera agenta (lokalny tar / LAN `:9999` / Samba / GitHub Releases),
+Instaluje Node LTS (winget) i pm2, pobiera agenta z GitHub Releases,
 instaluje zależności, rejestruje i włącza autostart (folder Startup). Pyta o `REPORT_INTERVAL`.
 Token rejestracji: `set REGISTER_TOKEN=<token>` przed uruchomieniem.
 Usunięcie: `uninstall-win.bat`.
@@ -140,26 +137,20 @@ Usunięcie: `uninstall-win.bat`.
 ### 4. Agent — telefon (Termux, Android)
 
 ```bash
-pkg install -y curl
-curl -fsSL http://<IP-serwera>:9999/setup-termux.sh -o /tmp/setup-dhm.sh
-REGISTER_TOKEN=<token> sh /tmp/setup-dhm.sh
+pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=<token> sh /tmp/setup-dhm.sh
 ```
 
-Skrypt: instaluje nodejs, pobiera agenta, rejestruje, startuje i konfiguruje autostart przez
+Skrypt: instaluje nodejs, pobiera agenta z GitHub Releases, rejestruje, startuje i konfiguruje autostart przez
 Termux:Boot (zainstaluj „Termux:Boot" z F-Droid i otwórz raz). Pyta o `REPORT_INTERVAL` (default 300 s).
-
-Instalacja ręczna (bez serwera plików): rozpakuj `dhm-agent.tar.gz` na urządzeniu i uruchom
-`SERVER_URL=http://IP-SERWERA:4000 DEVICE_NAME=Nazwa node index.js` (zmienne — patrz `.env.example`).
 
 ## Skrypty auto-instalacji
 
 | Platforma | Skrypt | Co robi |
 |-----------|--------|---------|
-| Serwer (Linux) | `scripts/serwer.sh` | rozpakowuje bundle, generuje tokeny, startuje pod pm2 (server + pliki `:9999`), UFW, autostart systemd |
+| Serwer (Linux) | `scripts/serwer.sh` | pobiera bundle, generuje tokeny, startuje pod pm2, UFW, autostart systemd |
 | Agent (Linux) | `scripts/user-linux.sh` | pobiera agenta, instaluje zależności, rejestruje, autostart systemd + linger |
 | Agent (Windows) | `scripts/user-win.bat` | winget Node, pm2, rejestracja, autostart (Startup) |
 | Agent (Termux) | `scripts/setup-termux.sh` | one-liner: pobiera agenta, rejestruje, autostart Termux:Boot |
-| Pliki instalacyjne | `server/serve-install.js` | serwuje tarball + skrypty na LAN (`:9999`) |
 | Usuwanie (serwer) | `scripts/uninstall-serwer.sh` | usuwa pm2 + katalog + reguły UFW |
 | Usuwanie (Linux) | `scripts/uninstall-linux.sh` | usuwa usługę systemd + katalog agenta |
 | Usuwanie (Windows) | `scripts/uninstall-win.bat` | usuwa pm2 + autostart + katalog |
@@ -248,7 +239,6 @@ device-health-monitor/
 ├── server/              ← serwer HTTP + WebSocket + SQLite
 │   ├── index.js         ← API + autoryzacja + rate limit + WebSocket
 │   ├── db.js
-│   ├── serve-install.js ← serwer plików instalacyjnych (LAN :9999)
 │   ├── lib/store.js     ← urządzenia, metryki, alerty (walidacja, loopback-fix)
 │   ├── lib/selfmonitor.js ← self-monitoring serwera (pomija interfejsy wirtualne)
 │   ├── lib/ratelimit.js ← proste rate limiting (zero zależności)
@@ -258,8 +248,8 @@ device-health-monitor/
 │   └── ecosystem.config.js
 ├── dashboard/           ← React/Vite dashboard (dist/ commitowany)
 │   └── src/
-├── scripts/             ← samoinstalatory:
-│   ├── serwer.sh        ← serwer (+ dhm-serve :9999)
+├── scripts/             ← instalatory 1-linerami:
+│   ├── serwer.sh        ← serwer
 │   ├── user-linux.sh    ← agent Linux
 │   ├── user-win.bat     ← agent Windows
 │   ├── setup-termux.sh  ← agent telefon (Termux)

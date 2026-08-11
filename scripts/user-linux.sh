@@ -6,28 +6,22 @@
 # DHM server and enables autostart (systemd user unit + linger, so it also
 # runs after reboot without login).
 #
-# Fully self-contained on the LAN (local tarball / :9999). When no local
-# copy exists - e.g. when run via the one-liner from the README - it
-# downloads the agent from GitHub Releases automatically.
+# Designed to be run as a ONE-LINER (from the README) - it downloads the
+# agent from GitHub Releases automatically. The installer does NOT delete
+# anything; to remove the agent use scripts/uninstall-linux.sh.
 #
-# Where the agent code comes from (first match wins):
+# Where the agent code comes from:
 #   1. INSTALL_DIR already contains index.js   -> used as-is
-#   2. dhm-agent.tar.gz next to this script    -> extracted
-#   3. dhm-bundle.tar.gz next to this script   -> agent/ extracted from it
-#   4. LAN file server  (:9999)                -> downloaded (internal net)
-#   5. GitHub Releases (dhm-agent.tar.gz)      -> downloaded
-# After the install the script cleans up (removes downloaded tarball).
+#   2. GitHub Releases (dhm-agent.tar.gz)      -> downloaded
 #
 # Variables:
 #   SERVER_URL      DHM server (empty = auto-detect local IP, then ask)
-#   SERVE_URL       LAN file server (default: http://192.168.0.10:9999)
 #   DEVICE_NAME     dashboard name (default: hostname)
 #   DEVICE_TYPE     server|desktop|laptop (default: desktop)
 #   REPORT_INTERVAL report interval in seconds (default: 60, phone: 300)
-#   REGISTER_TOKEN  registration token (or dhm-token.txt next to this
-#                   script, or interactive prompt)
+#   REGISTER_TOKEN  registration token (or interactive prompt)
 #   INSTALL_DIR     install dir (default: $HOME/dhm-agent)
-#   GITHUB_URL      agent tarball on GitHub Releases (fallback download)
+#   GITHUB_URL      agent tarball on GitHub Releases
 #
 # Example:
 #   ./user-linux.sh
@@ -37,7 +31,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SERVER_URL="${SERVER_URL:-}"
-SERVE_URL="${SERVE_URL:-http://192.168.0.10:9999}"
 GITHUB_URL="${GITHUB_URL:-https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/dhm-agent.tar.gz}"
 DEVICE_NAME="${DEVICE_NAME:-$(hostname)}"
 DEVICE_TYPE="${DEVICE_TYPE:-desktop}"
@@ -52,10 +45,7 @@ fail() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# ---- registration token: env -> dhm-token.txt (LAN) -> prompt ----
-if [ -z "$REGISTER_TOKEN" ] && [ -f "$SCRIPT_DIR/dhm-token.txt" ]; then
-    REGISTER_TOKEN="$(tr -d '\r\n' < "$SCRIPT_DIR/dhm-token.txt")"
-fi
+# ---- registration token: env -> prompt ----
 if [ -z "$REGISTER_TOKEN" ]; then
     printf 'Registration token (REGISTER_TOKEN from server/.env): '
     read -r REGISTER_TOKEN || true
@@ -139,49 +129,22 @@ command -v npm  >/dev/null 2>&1 || fail "npm not found after install"
 command -v curl >/dev/null 2>&1 || fail "curl not found after install"
 ok "Node.js $(node --version)"
 
-# ---- get the agent code (offline on LAN, GitHub Releases as fallback) ----
-# Priority: 1) existing install, 2) dhm-agent.tar.gz next to script,
-#           3) dhm-bundle.tar.gz next to script, 4) LAN server :9999,
-#           5) GitHub Releases.
+# ---- get the agent code (GitHub Releases) ----
 if [ -f "$INSTALL_DIR/index.js" ]; then
     warn "Agent files already present in $INSTALL_DIR - using them (no download)."
 else
     mkdir -p "$INSTALL_DIR"
     TMP_AGENT="$(mktemp)"
-    CLEANUP_AGENT=0
-    if [ -f "$SCRIPT_DIR/dhm-agent.tar.gz" ]; then
-        warn "Extracting agent from $SCRIPT_DIR/dhm-agent.tar.gz ..."
-        tar xzf "$SCRIPT_DIR/dhm-agent.tar.gz" -C "$INSTALL_DIR" 2>/dev/null \
-            || fail "Could not extract dhm-agent.tar.gz."
-    elif [ -f "$SCRIPT_DIR/dhm-bundle.tar.gz" ]; then
-        warn "Extracting agent/ from $SCRIPT_DIR/dhm-bundle.tar.gz ..."
-        rm -rf "$INSTALL_DIR"
-        mkdir -p "$INSTALL_DIR"
-        TMP_BD="$(mktemp -d)"
-        tar xzf "$SCRIPT_DIR/dhm-bundle.tar.gz" -C "$TMP_BD" --strip-components=1 2>/dev/null \
-            || fail "Could not extract dhm-bundle.tar.gz."
-        [ -d "$TMP_BD/agent" ] || fail "dhm-bundle.tar.gz has no agent/ directory."
-        cp -a "$TMP_BD/agent/." "$INSTALL_DIR/"
-        rm -rf "$TMP_BD"
-    elif curl -fsSL --max-time 10 "$SERVE_URL/dhm-agent.tar.gz" -o "$TMP_AGENT" 2>/dev/null; then
-        warn "Downloading agent from $SERVE_URL ..."
-        tar xzf "$TMP_AGENT" -C "$INSTALL_DIR" 2>/dev/null \
-            || fail "Could not extract the downloaded agent tarball."
-        CLEANUP_AGENT=1
-    elif curl -fsSL --max-time 120 "$GITHUB_URL" -o "$TMP_AGENT" 2>/dev/null; then
+    if curl -fsSL --max-time 120 "$GITHUB_URL" -o "$TMP_AGENT" 2>/dev/null; then
         warn "Downloading agent from GitHub Releases ..."
         tar xzf "$TMP_AGENT" -C "$INSTALL_DIR" 2>/dev/null \
             || fail "Could not extract the downloaded agent tarball."
-        CLEANUP_AGENT=1
     else
-        fail "No agent code found. Put dhm-agent.tar.gz (or dhm-bundle.tar.gz) next to
-   this script, make the LAN server :9999 reachable, or let the script
-   download it from GitHub Releases (needs internet)."
+        rm -f "$TMP_AGENT"
+        fail "Could not download the agent from $GITHUB_URL.
+   Check the internet connection / GITHUB_URL."
     fi
     rm -f "$TMP_AGENT"
-    if [ "$CLEANUP_AGENT" = "1" ]; then
-        warn "Cleaning up downloaded tarball."
-    fi
 fi
 rm -f "$INSTALL_DIR/.api_key"
 [ -f "$INSTALL_DIR/index.js" ] || fail "Agent files missing in $INSTALL_DIR"
