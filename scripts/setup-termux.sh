@@ -29,6 +29,16 @@ REGISTER_TOKEN="${REGISTER_TOKEN:-}"
 INSTALL_DIR="$HOME/dhm-agent"
 AGENT_TAR="$HOME/dhm-agent.tar.gz"
 
+# --- Registration token: env -> prompt (or abort) ---
+if [ -z "$REGISTER_TOKEN" ]; then
+  printf "Registration token (REGISTER_TOKEN from server/.env): "
+  read -r REGISTER_TOKEN || true
+fi
+if [ -z "$REGISTER_TOKEN" ]; then
+  echo "[ERROR] No registration token - get it from server/.env on the DHM server."
+  exit 1
+fi
+
 # --- Detect the phone's local IP (if `ip` is available) ---
 detect_ip() {
   command -v ip >/dev/null 2>&1 && ip -4 addr show scope global 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | head -1

@@ -19,7 +19,8 @@ Dashboard + agenty do monitorowania kondycji urządzeń w sieci: CPU, RAM, dysk,
 
 ### 0. Instalacja 1-linerem (z GitHub)
 
-Najpierw serwer, potem agenty. Serwer na końcu wypisuje `REGISTER_TOKEN`.
+Najpierw serwer, potem agenty. Serwer na końcu wypisuje `REGISTER_TOKEN` —
+**wklej 1-liner, Enter, i odpowiedz na pytania** (port/adres, token, interwał raportowania).
 
 **Serwer (Debian/Ubuntu/Fedora):**
 
@@ -30,24 +31,28 @@ curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/dow
 **Agent — Linux:**
 
 ```bash
-curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && REGISTER_TOKEN=<token> SERVER_URL=http://<IP-serwera>:4000 sh /tmp/dhm.sh
+curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && sh /tmp/dhm.sh
 ```
 
 **Agent — Windows (cmd):**
 
 ```bat
-set SERVER_URL=http://<IP-serwera>:4000 && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && %TEMP%\user-win.bat
+curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && %TEMP%\user-win.bat
 ```
 
 **Agent — telefon (Termux, Android):**
 
 ```bash
-pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=<token> SERVER_URL=http://<IP-serwera>:4000 sh /tmp/setup-dhm.sh
+pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && sh /tmp/setup-dhm.sh
 ```
 
-Każdy skrypt sam wykrywa serwer (probe własnego IP + bramki) albo podajesz `SERVER_URL` jawnie,
-instaluje Node.js jeśli brak i konfiguruje autostart. Cały kod pochodzi z `releases/latest/download/...` — bez buildowania
-i bez `git clone`.
+Każdy skrypt sam wykrywa serwer (probe własnego IP + bramki), a jak nie — pyta; instaluje Node.js jeśli brak
+i konfiguruje autostart. Cały kod pochodzi z `releases/latest/download/...` — bez buildowania i bez `git clone`.
+
+**Instalacja bez pytań (unattended):** ustaw zmienne wcześniej, np.
+`REGISTER_TOKEN=<token> SERVER_URL=http://<IP-serwera>:4000 sh /tmp/dhm.sh`
+(Windows: `set REGISTER_TOKEN=<token> && set SERVER_URL=http://<IP-serwera>:4000 && %TEMP%\user-win.bat`,
+serwer: `PORT=4000 sh /tmp/serwer.sh`).
 
 ### 1. Serwer (Debian/Ubuntu/Fedora)
 
@@ -66,36 +71,36 @@ Użyteczne zmienne: `PORT`, `AUTH_TOKEN`, `REGISTER_TOKEN`, `PM2_NAME` (patrz na
 ### 2. Agent — Linux
 
 ```bash
-curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && REGISTER_TOKEN=<token> SERVER_URL=http://<IP-serwera>:4000 sh /tmp/dhm.sh
-# nazwa i typ urządzenia: DEVICE_NAME=Laptop DEVICE_TYPE=laptop
+curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && sh /tmp/dhm.sh
+# unattended: REGISTER_TOKEN=<token> SERVER_URL=http://<IP-serwera>:4000 DEVICE_NAME=Laptop DEVICE_TYPE=laptop
 ```
 
-Skrypt pyta o `REPORT_INTERVAL` (default 60 s), pobiera agenta z GitHub Releases,
-instaluje zależności, rejestruje urządzenie i konfiguruje autostart (systemd user unit + linger).
-Jeśli `SERVER_URL` puste — auto-detekcja (probe własnego IP + bramki), inaczej pyta.
+Skrypt pyta o `REPORT_INTERVAL` (default 60 s), adres serwera i token rejestracji;
+pobiera agenta z GitHub Releases, instaluje zależności, rejestruje urządzenie i konfiguruje
+autostart (systemd user unit + linger). Jeśli `SERVER_URL` puste — auto-detekcja (probe własnego IP + bramki), inaczej pyta.
 
 ### 3. Agent — Windows
 
 ```bat
-set SERVER_URL=http://<IP-serwera>:4000 && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && %TEMP%\user-win.bat
+curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && %TEMP%\user-win.bat
 ```
 
 Instaluje Node LTS (winget) i pm2, pobiera agenta z GitHub Releases,
-instaluje zależności, rejestruje i włącza autostart (folder Startup). Pyta o `REPORT_INTERVAL`.
-Token rejestracji: `set REGISTER_TOKEN=<token>` przed uruchomieniem (albo wpisz gdy spyta).
-Jeśli `SERVER_URL` puste — skrypt o nie pyta.
+instaluje zależności, rejestruje i włącza autostart (folder Startup). Pyta o `REPORT_INTERVAL`,
+adres serwera i token rejestracji.
+Unattended: `set REGISTER_TOKEN=<token> && set SERVER_URL=http://<IP-serwera>:4000 && %TEMP%\user-win.bat`.
 Usunięcie: `uninstall-win.bat`.
 
 ### 4. Agent — telefon (Termux, Android)
 
 ```bash
-pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=<token> SERVER_URL=http://<IP-serwera>:4000 sh /tmp/setup-dhm.sh
+pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && sh /tmp/setup-dhm.sh
 ```
 
 Skrypt: instaluje nodejs, pobiera agenta z GitHub Releases, rejestruje, startuje i konfiguruje autostart przez
-Termux:Boot (zainstaluj „Termux:Boot" z F-Droid i otwórz raz). Pyta o `REPORT_INTERVAL` (default 300 s).
-Podaj `SERVER_URL` jawnie — auto-detekcja na telefonach często zawodzi (AP/client isolation); jeśli puste,
-skrypt probuje Twoje IP + bramkę, a potem pyta.
+Termux:Boot (zainstaluj „Termux:Boot" z F-Droid i otwórz raz). Pyta o `REPORT_INTERVAL` (default 300 s),
+adres serwera i token rejestracji. Auto-detekcja na telefonach często zawodzi (AP/client isolation) —
+jeśli się nie uda, wpisz adres gdy zapyta.
 
 ## Funkcje dashboardu
 - Widok na żywo (WebSocket + polling 5 s).
