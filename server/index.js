@@ -6,7 +6,7 @@ const net = require('net');
 const { WebSocketServer } = require('ws');
 const http = require('http');
 const store = require('./lib/store');
-const rateLimit = require('./lib/ratelimit');
+const { ipKeyGenerator, rateLimit } = require('express-rate-limit');
 const selfmonitor = require('./lib/selfmonitor');
 
 if (fs.existsSync(path.join(__dirname, '.env'))) {
@@ -26,9 +26,13 @@ app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.static(path.join(__dirname, '../dashboard/dist')));
 
-const limiterRegister = rateLimit(60_000, 5, (req) => req.ip);
-const limiterWrite = rateLimit(60_000, 30, (req) => req.ip);
-const limiterReport = rateLimit(60_000, 30, (req) => req.headers['x-api-key'] || req.ip);
+const limiterRegister = rateLimit({ windowMs: 60_000, limit: 5 });
+const limiterWrite = rateLimit({ windowMs: 60_000, limit: 30 });
+const limiterReport = rateLimit({
+  windowMs: 60_000,
+  limit: 30,
+  keyGenerator: (req) => req.headers['x-api-key'] || ipKeyGenerator(req.ip),
+});
 
 function authWrite(req, res, next) {
   if (!AUTH_TOKEN) {
@@ -49,7 +53,11 @@ function authenticateAgent(req, res, next) {
   next();
 }
 
-// --- Agent endpoints ---
+function cleanName(name) {
+  return typeof name === 'string' && name.trim() && name.trim().length <= 64 ? name.trim() : null;
+}
+
+// Agent endpoints
 app.post('/api/agent/register', limiterRegister, (req, res) => {
   const { name, ip, type, os_name, mac, register_token } = req.body || {};
   if (!REGISTER_TOKEN) {
@@ -58,7 +66,7 @@ app.post('/api/agent/register', limiterRegister, (req, res) => {
   if (register_token !== REGISTER_TOKEN) {
     return res.status(403).json({ error: 'Invalid register token' });
   }
-  if (typeof name !== 'string' || !name.trim() || name.trim().length > 64) {
+  if (!cleanName(name)) {
     return res.status(400).json({ error: 'name invalid' });
   }
   if (typeof ip !== 'string' || net.isIP(ip.trim()) === 0) {
@@ -67,7 +75,7 @@ app.post('/api/agent/register', limiterRegister, (req, res) => {
   const types = ['server', 'desktop', 'laptop', 'phone', 'android', 'unknown'];
   const deviceType = types.includes(type) ? type : 'unknown';
   const device = store.registerDevice(
-    name.trim(),
+    cleanName(name),
     ip.trim(),
     deviceType,
     typeof os_name === 'string' ? os_name.slice(0, 32) : 'unknown',
@@ -88,7 +96,7 @@ app.post('/api/agent/report', limiterReport, authenticateAgent, (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Dashboard endpoints (odczyt otwarty, bez logowania) ---
+// Dashboard endpoints (read-only, open dashboard)
 app.get('/api/devices', (req, res) => {
   const devices = store.getAllDevices().map((d) => {
     const { api_key, ...device } = d;
@@ -143,15 +151,13 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, uptime: process.uptime(), version: require('./package.json').version || null });
 });
 
-// --- Endpointy zapisu (wymagają X-Auth-Token) ---
+// Write endpoints (require X-Auth-Token)
 app.patch('/api/devices/:id', limiterWrite, authWrite, (req, res) => {
   const id = Number(req.params.id);
   if (!store.getDevice(id)) return res.status(404).json({ error: 'Not found' });
-  const name = req.body?.name;
-  if (typeof name !== 'string' || !name.trim() || name.trim().length > 64) {
-    return res.status(400).json({ error: 'name invalid' });
-  }
-  store.updateDeviceName(id, name.trim());
+  const name = cleanName(req.body?.name);
+  if (!name) return res.status(400).json({ error: 'name invalid' });
+  store.updateDeviceName(id, name);
   res.json({ ok: true, device: store.getDevice(id) });
 });
 
@@ -176,7 +182,16 @@ app.get('/*splat', (req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/dist/index.html'));
 });
 
-// --- HTTP + WebSocket ---
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
+app.use((err, req, res, next) => {
+  console.error(`[error] ${req.method} ${req.originalUrl}:`, err.message || err);
+  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+});
+
+// HTTP + WebSocket
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
