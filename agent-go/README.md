@@ -32,10 +32,10 @@ The agent re-registers automatically when the server rejects the key (401/403).
 
 Measured on the same server, 10 s interval, 60 s window:
 
-| | RSS | CPU (1 core) | Size | Dependencies |
-|---|---|---|---|---|
-| Go | ~10 MB | 0.07 % | ~6 MB (1 file) | none |
-| Node | ~78 MB | 1.83 % | 0.9 MB + node_modules | systeminformation |
+|       | RSS    | CPU (1 core) | Size                  | Dependencies      |
+|-------|--------|--------------|--------------------===|-------------------|
+| Go    | ~10 MB | 0.07 %       | ~6 MB (1 file)        | none              |
+| Node  | ~78 MB | 1.83 %       | 0.9 MB + node_modules | systeminformation |
 
 ~7x less RAM, ~26x less CPU.
 
@@ -43,3 +43,7 @@ Measured on the same server, 10 s interval, 60 s window:
 
 Prototype. Linux only — Windows is not implemented (would need gopsutil
 or a separate implementation).
+
+Happy to hear if someone will use this on server/or smf.
+
+anyways no one will read this probably
