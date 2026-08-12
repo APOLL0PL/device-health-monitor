@@ -1,35 +1,13 @@
 #!/usr/bin/env bash
-# ============================================================================
-# DHM AGENT - Linux auto-install (Debian/Ubuntu/Fedora/Arch/RPi)
+# Instalacja agenta DHM (Debian/Ubuntu/Fedora/Arch/RPi).
+# Ściąga agenta z GitHub Releases, rejestruje urządzenie i włącza
+# autostart (systemd user unit + linger). Nic nie usuwa.
 #
-# Installs the DHM agent on this machine, registers the device with the
-# DHM server and enables autostart (systemd user unit + linger, so it also
-# runs after reboot without login).
-#
-# Designed to be run as a ONE-LINER (from the README) - it downloads the
-# agent from GitHub Releases automatically. The installer does NOT delete
-# anything; to remove the agent use scripts/uninstall-linux.sh.
-#
-# Where the agent code comes from:
-#   1. INSTALL_DIR already contains index.js   -> used as-is
-#   2. GitHub Releases (dhm-agent.tar.gz)      -> downloaded
-#
-# Variables:
-#   SERVER_URL      DHM server (empty = probe own IP + gateway, then ask)
-#   DEVICE_NAME     dashboard name (default: hostname)
-#   DEVICE_TYPE     server|desktop|laptop (default: desktop)
-#   REPORT_INTERVAL report interval in seconds (default: 60, phone: 300)
-#   REGISTER_TOKEN  registration token (or interactive prompt)
-#   INSTALL_DIR     install dir (default: $HOME/dhm-agent)
-#   GITHUB_URL      agent tarball on GitHub Releases
-#
-# Example:
-#   ./user-linux.sh
-#   REGISTER_TOKEN=... SERVER_URL=http://<server-IP>:4000 DEVICE_NAME=Laptop ./user-linux.sh
-# ============================================================================
+# Zmienne: SERVER_URL, DEVICE_NAME, DEVICE_TYPE, REPORT_INTERVAL,
+#          REGISTER_TOKEN, INSTALL_DIR, GITHUB_URL
+# Przykład: REGISTER_TOKEN=... SERVER_URL=http://<server-IP>:4000 DEVICE_NAME=Laptop ./user-linux.sh
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SERVER_URL="${SERVER_URL:-}"
 GITHUB_URL="${GITHUB_URL:-https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/dhm-agent.tar.gz}"
 DEVICE_NAME="${DEVICE_NAME:-$(hostname)}"
@@ -43,37 +21,35 @@ ok()   { echo -e "${GREEN}[OK]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 fail() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 
-# ---- must NOT run as root: the agent uses a systemd USER service ----
+# ---- NIE uruchamiać jako root: agent używa usługi systemd USER ----
 if [ "$(id -u)" -eq 0 ]; then
-    fail "Do not run this installer as root - the agent uses a systemd user service.
-   Run it as a normal user (no sudo needed)."
+    fail "Nie uruchamiaj instalatora jako root - agent używa usługi systemd user.
+   Uruchom jako zwykły użytkownik (sudo niepotrzebne)."
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-# ---- registration token: env -> prompt ----
+# ---- token rejestracji: env -> prompt ----
 if [ -z "$REGISTER_TOKEN" ]; then
-    printf 'Registration token (REGISTER_TOKEN from server/.env): '
+    printf 'Token rejestracji (REGISTER_TOKEN z server/.env): '
     read -r REGISTER_TOKEN || true
 fi
 
-# ---- report interval (seconds): env -> prompt (default 60, phone 300) ----
+# ---- interwał raportowania (s): env -> prompt (domyślnie 60, telefon 300) ----
 if [ -z "$REPORT_INTERVAL" ]; then
     DEFAULT_INTERVAL=60
     if [ "$DEVICE_TYPE" = "phone" ] || [ "$DEVICE_TYPE" = "android" ]; then
         DEFAULT_INTERVAL=300
     fi
-    printf 'How often should the agent report? (seconds) [%s]: ' "$DEFAULT_INTERVAL"
+    printf 'Jak często agent ma raportować? (sekundy) [%s]: ' "$DEFAULT_INTERVAL"
     read -r REPORT_INTERVAL || true
     REPORT_INTERVAL="${REPORT_INTERVAL:-$DEFAULT_INTERVAL}"
 fi
 if ! echo "$REPORT_INTERVAL" | grep -qE '^[0-9]{1,5}$' || [ "$REPORT_INTERVAL" -lt 10 ]; then
-    warn "Invalid REPORT_INTERVAL - using default (60s)."
+    warn "Nieprawidłowy REPORT_INTERVAL - ustawiam domyślny (60s)."
     REPORT_INTERVAL=60
 fi
-ok "Report interval: ${REPORT_INTERVAL}s"
+ok "Interwał raportowania: ${REPORT_INTERVAL}s"
 
-# ---- server address (probe own IP + gateway, otherwise ask) ----
+# ---- adres serwera (probe własne IP + bramy, inaczej pytaj) ----
 get_local_ip() {
     local ip
     ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}')
@@ -97,7 +73,7 @@ if [ -z "$SERVER_URL" ]; then
     for cand in "$LOCAL_IP" "$GATEWAY_IP"; do
         if [ -n "$cand" ] && dhm_probe "$cand" 4000; then
             SERVER_URL="http://$cand:4000"
-            ok "Detected DHM server at: $SERVER_URL"
+            ok "Wykryto serwer DHM: $SERVER_URL"
             break
         fi
     done
@@ -105,22 +81,22 @@ if [ -z "$SERVER_URL" ]; then
         DEFAULT_IP="${GATEWAY_IP:-$LOCAL_IP}"
         [ -z "$DEFAULT_IP" ] && DEFAULT_IP=localhost
         DEFAULT_URL="http://${DEFAULT_IP}:4000"
-        warn "Could not auto-detect the DHM server (probed own IP + gateway)."
-        printf 'DHM server address (http://IP:4000) [%s]: ' "$DEFAULT_URL"
+        warn "Nie wykryto serwera DHM (sprawdzono własne IP i bramę)."
+        printf 'Adres serwera DHM (http://IP:4000) [%s]: ' "$DEFAULT_URL"
         read -r ans || true
         SERVER_URL="${ans:-$DEFAULT_URL}"
     fi
 fi
 
 echo
-echo "=== DHM Agent install (Linux) ==="
-echo "Server:    $SERVER_URL"
-echo "Device:    $DEVICE_NAME  ($DEVICE_TYPE)"
+echo "=== Instalacja agenta DHM (Linux) ==="
+echo "Serwer:    $SERVER_URL"
+echo "Urządzenie: $DEVICE_NAME  ($DEVICE_TYPE)"
 echo
 
 # ---- Node.js + curl ----
 if ! command -v curl >/dev/null 2>&1; then
-    echo "curl not found. Installing..."
+    echo "Brak curl. Instaluję..."
     if command -v apt-get >/dev/null 2>&1; then
         sudo apt-get update -y && sudo apt-get install -y curl
     elif command -v dnf >/dev/null 2>&1; then
@@ -130,7 +106,7 @@ if ! command -v curl >/dev/null 2>&1; then
     fi
 fi
 if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-    echo "Node.js not found. Installing..."
+    echo "Brak Node.js. Instaluję..."
     if command -v apt-get >/dev/null 2>&1; then
         sudo apt-get update -y && sudo apt-get install -y nodejs npm
     elif command -v dnf >/dev/null 2>&1; then
@@ -138,42 +114,42 @@ if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
     elif command -v pacman >/dev/null 2>&1; then
         sudo pacman -S --noconfirm nodejs npm
     else
-        fail "Unknown package manager - install Node.js >= 18 manually (https://nodejs.org)."
+        fail "Nieznany menedżer pakietów - zainstaluj Node.js >= 18 ręcznie (https://nodejs.org)."
     fi
 fi
-command -v node >/dev/null 2>&1 || fail "node not found after install"
-command -v npm  >/dev/null 2>&1 || fail "npm not found after install"
-command -v curl >/dev/null 2>&1 || fail "curl not found after install"
+command -v node >/dev/null 2>&1 || fail "node dalej niedostępny po instalacji"
+command -v npm  >/dev/null 2>&1 || fail "npm dalej niedostępny po instalacji"
+command -v curl >/dev/null 2>&1 || fail "curl dalej niedostępny po instalacji"
 ok "Node.js $(node --version)"
 
-# ---- get the agent code (GitHub Releases) ----
+# ---- pobierz agenta (już jest -> nie ściągaj) ----
 if [ -f "$INSTALL_DIR/index.js" ]; then
-    warn "Agent files already present in $INSTALL_DIR - using them (no download)."
+    warn "Pliki agenta już są w $INSTALL_DIR - używam ich (bez pobierania)."
 else
     mkdir -p "$INSTALL_DIR"
     TMP_AGENT="$(mktemp)"
     if curl -fsSL --max-time 120 "$GITHUB_URL" -o "$TMP_AGENT" 2>/dev/null; then
-        warn "Downloading agent from GitHub Releases ..."
+        warn "Pobieram agenta z GitHub Releases ..."
         tar xzf "$TMP_AGENT" -C "$INSTALL_DIR" 2>/dev/null \
-            || fail "Could not extract the downloaded agent tarball."
+            || fail "Nie udało się rozpakować archiwum agenta."
     else
         rm -f "$TMP_AGENT"
-        fail "Could not download the agent from $GITHUB_URL.
-   Check the internet connection / GITHUB_URL."
+        fail "Nie udało się pobrać agenta z $GITHUB_URL.
+   Sprawdź połączenie / zmienną GITHUB_URL."
     fi
     rm -f "$TMP_AGENT"
 fi
 rm -f "$INSTALL_DIR/.api_key"
-[ -f "$INSTALL_DIR/index.js" ] || fail "Agent files missing in $INSTALL_DIR"
-ok "Agent ready"
+[ -f "$INSTALL_DIR/index.js" ] || fail "Brak plików agenta w $INSTALL_DIR"
+ok "Agent gotowy"
 
-# ---- dependencies ----
+# ---- zależności ----
 cd "$INSTALL_DIR"
-npm install --omit=dev || fail "npm install failed."
-ok "Dependencies installed"
+npm install --omit=dev || fail "npm install się nie powiodło."
+ok "Zależności zainstalowane"
 
-# ---- register + first run ----
-echo "Registering with the server..."
+# ---- rejestracja + pierwszy start ----
+echo "Rejestruję z serwerem..."
 SERVER_URL="$SERVER_URL" \
 DEVICE_NAME="$DEVICE_NAME" \
 DEVICE_TYPE="$DEVICE_TYPE" \
@@ -184,11 +160,11 @@ AGENT_PID=$!
 sleep 12
 kill "$AGENT_PID" 2>/dev/null || true
 if [ ! -f "$INSTALL_DIR/.api_key" ]; then
-    echo "[ERROR] Registration failed. Log:"
+    echo "[ERROR] Rejestracja nie powiodła się. Log:"
     cat /tmp/dhm-agent-register.log
-    fail "Check REGISTER_TOKEN and whether the server is reachable."
+    fail "Sprawdź REGISTER_TOKEN i czy serwer jest osiągalny."
 fi
-ok "Registered"
+ok "Zarejestrowano"
 
 # ---- autostart: systemd user unit + linger ----
 if [ -d /run/systemd/system ] || [ -d /etc/systemd ]; then
@@ -217,22 +193,22 @@ EOF
     if systemctl --user daemon-reload 2>/dev/null && systemctl --user enable --now dhm-agent 2>/dev/null; then
         if ! loginctl enable-linger "$USER" 2>/dev/null; then
             sudo loginctl enable-linger "$USER" 2>/dev/null \
-                || warn "Could not enable linger - the agent will start only after login."
+                || warn "Nie udało się włączyć linger - agent wystartuje dopiero po zalogowaniu."
         fi
-        ok "Autostart configured (systemd user service + linger)"
+        ok "Autostart skonfigurowany (systemd user + linger)"
     else
-        warn "systemctl --user unavailable here (no login session?) - starting the agent directly."
+        warn "systemctl --user niedostępny (brak sesji logowania?) - startuję agenta bezpośrednio."
         nohup "$NODE_BIN" index.js >/tmp/dhm-agent.log 2>&1 &
-        echo "To enable boot autostart later, add a user systemd service (see README.md)."
+        echo "Aby włączyć autostart później, dodaj user systemd service (patrz README.md)."
     fi
 else
-    warn "No systemd detected - add a manual autostart entry (see README.md)."
+    warn "Brak systemd - dodaj ręcznie autostart (patrz README.md)."
 fi
 
 echo
-echo "=== DONE ==="
-echo "Server:    $SERVER_URL"
-echo "Device:    $DEVICE_NAME  ($DEVICE_TYPE)"
-echo "Reports:   every ${REPORT_INTERVAL}s"
-echo "Logs:      journalctl --user -u dhm-agent -f"
-echo "Dashboard: $SERVER_URL  (the device shows up on its own in ~1 min)"
+echo "=== GOTOWE ==="
+echo "Serwer:    $SERVER_URL"
+echo "Urządzenie: $DEVICE_NAME  ($DEVICE_TYPE)"
+echo "Raporty:   co ${REPORT_INTERVAL}s"
+echo "Logi:      journalctl --user -u dhm-agent -f"
+echo "Dashboard: $SERVER_URL  (urządzenie pojawi się samo w ok. 1 min)"

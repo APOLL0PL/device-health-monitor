@@ -4,9 +4,8 @@ chcp 65001 >nul
 title DHM Agent - Uninstall (Windows)
 
 rem ============================================================
-rem DHM AGENT - uninstall (Windows)
-rem Stops only the DHM agent, removes the agent files and the
-rem autostart entry. Other node/pm2 apps are left untouched.
+rem Usuwanie agenta DHM (Windows). Zatrzymuje tylko agenta DHM,
+rem usuwa pliki i autostart. Inne apki node/pm2 sa nietkniete.
 rem ============================================================
 
 set "PATH=%APPDATA%\npm;%PATH%"
@@ -20,6 +19,6 @@ if exist "C:\dhm-agent.tar.gz" del "C:\dhm-agent.tar.gz" >nul 2>nul
 if exist "%ProgramData%\Microsoft\Windows\Start Menu\Programs\Startup\dhm-autostart.bat" del "%ProgramData%\Microsoft\Windows\Start Menu\Programs\Startup\dhm-autostart.bat" >nul 2>nul
 if exist "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\dhm-autostart.bat" del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\dhm-autostart.bat" >nul 2>nul
 
-echo === Removed ===
-echo A reboot is recommended.
+echo === Usunieto ===
+echo Zalecany restart systemu.
 pause

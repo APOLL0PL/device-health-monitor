@@ -128,8 +128,8 @@ export default function App() {
           {devices.length === 0 && (
             <div className="empty-state">
               <p>Brak urzadzen.</p>
-              <p>Uruchom agenta na urzadzeniu:</p>
-              <code>SERVER_URL=http://&lt;server-IP&gt;:4000 DEVICE_NAME="My Laptop" node agent/index.js</code>
+              <p>Zainstaluj agenta one-linerem z README (serwer poda Ci REGISTER_TOKEN):</p>
+              <code>curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh &amp;&amp; sh /tmp/dhm.sh</code>
             </div>
           )}
           {devices.map((d) => (

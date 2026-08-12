@@ -1,33 +1,10 @@
 #!/usr/bin/env bash
-# ============================================================================
-# DHM SERVER - auto-setup (Debian/Ubuntu/Fedora/Arch/RPi)
+# Instalacja serwera DHM (Debian/Ubuntu/Fedora/Arch/RPi).
+# Ściąga bundle z GitHub Releases do $INSTALL_DIR, generuje tokeny,
+# startuje pod pm2 i włącza autostart (systemd). Nic nie usuwa.
 #
-# Installs the DHM server + dashboard, starts it under pm2 and enables
-# autostart (systemd).
-#
-# Designed to be run as a ONE-LINER (from the README) - it downloads the
-# code from GitHub Releases automatically. The installer does NOT delete
-# anything; to remove DHM use scripts/uninstall-serwer.sh.
-#
-# Where the code comes from:
-#   1. INSTALL_DIR already contains server/index.js  -> used as-is
-#   2. GitHub Releases (dhm-bundle.tar.gz)            -> downloaded
-#
-# Variables (optionally set before running):
-#   INSTALL_DIR     install dir (default: $HOME/device-health-monitor)
-#   GITHUB_URL      bundle download URL (GitHub Releases by default)
-#   PORT            server port (default: 4000)
-#   AUTH_TOKEN      dashboard write token (optional, generated if empty)
-#   REGISTER_TOKEN  registration token (optional, generated if empty)
-#   PM2_NAME        pm2 process name of the server (default: dhm-server)
-#
-# For a SECOND instance on the same machine: give it a different INSTALL_DIR,
-# PORT and PM2_NAME (e.g. INSTALL_DIR=$HOME/dhm-test PORT=4001
-# PM2_NAME=dhm-server-test).
-#
-# Example:
-#   ./serwer.sh
-# ============================================================================
+# Zmienne: PORT, AUTH_TOKEN, REGISTER_TOKEN, PM2_NAME, INSTALL_DIR, GITHUB_URL
+# Druga instancja na tej maszynie: inny INSTALL_DIR + PORT + PM2_NAME.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -43,7 +20,7 @@ ok()   { echo -e "${GREEN}[OK]${NC} $*"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 fail() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 
-# --- Port selection + busy check ---
+# --- Port + sprawdzenie czy wolny ---
 port_in_use() {
     local p="$1"
     if command -v ss >/dev/null 2>&1; then
@@ -61,33 +38,33 @@ port_in_use() {
 
 if [ -n "$PORT" ]; then
     if ! echo "$PORT" | grep -qE '^[0-9]{1,5}$' || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
-        fail "PORT=$PORT is invalid - use a number 1-65535."
+        fail "PORT=$PORT jest nieprawidłowy - użyj liczby 1-65535."
     fi
     if port_in_use "$PORT"; then
-        fail "Port $PORT is already in use. Pick a free one, e.g.: PORT=4001 ./serwer.sh"
+        fail "Port $PORT jest już zajęty. Wybierz wolny, np.: PORT=4001 ./serwer.sh"
     fi
 else
     PORT=4000
     while true; do
-        read -r -p "Which port should the DHM server listen on? [4000]: " ans
+        read -r -p "Na jakim porcie ma nasłuchiwać serwer DHM? [4000]: " ans
         ans="${ans:-4000}"
         if ! echo "$ans" | grep -qE '^[0-9]{1,5}$' || [ "$ans" -lt 1 ] || [ "$ans" -gt 65535 ]; then
-            warn "Invalid port - use a number 1-65535."
+            warn "Nieprawidłowy port - użyj liczby 1-65535."
             continue
         fi
         PORT="$ans"
         if port_in_use "$PORT"; then
-            warn "Port $PORT is already IN USE - pick another one."
+            warn "Port $PORT jest już zajęty - wybierz inny."
             continue
         fi
         break
     done
 fi
-ok "Chosen port: $PORT"
+ok "Wybrany port: $PORT"
 
-# --- Requirements ---
+# --- Wymagania ---
 if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-    echo "Node.js not found. Installing..."
+    echo "Brak Node.js. Instaluję..."
     if command -v apt-get >/dev/null 2>&1; then
         sudo apt-get update -y && sudo apt-get install -y nodejs npm build-essential python3 curl
     elif command -v dnf >/dev/null 2>&1; then
@@ -95,18 +72,18 @@ if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
     elif command -v pacman >/dev/null 2>&1; then
         sudo pacman -S --noconfirm nodejs npm base-devel python curl
     else
-        fail "Unknown package manager - install Node.js >= 18 manually (https://nodejs.org)."
+        fail "Nieznany menedżer pakietów - zainstaluj Node.js >= 18 ręcznie (https://nodejs.org)."
     fi
 fi
-command -v node >/dev/null 2>&1 || fail "node not found after install"
-command -v npm  >/dev/null 2>&1 || fail "npm not found after install"
-command -v curl >/dev/null 2>&1 || fail "curl not found after install"
+command -v node >/dev/null 2>&1 || fail "node dalej niedostępny po instalacji"
+command -v npm  >/dev/null 2>&1 || fail "npm dalej niedostępny po instalacji"
+command -v curl >/dev/null 2>&1 || fail "curl dalej niedostępny po instalacji"
 ok "Node.js $(node --version)"
 
-# --- native build tools (better-sqlite3 needs a C++ compiler + make + python3) ---
+# --- Narzędzia build (better-sqlite3 potrzebuje kompilatora C++) ---
 has_cxx() { command -v g++ >/dev/null 2>&1 || command -v c++ >/dev/null 2>&1 || command -v clang++ >/dev/null 2>&1; }
 if ! has_cxx || ! command -v make >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
-    echo "Missing native build tools (better-sqlite3 needs a C++ compiler + make + python3). Installing..."
+    echo "Brak narzędzi build (potrzebne do better-sqlite3). Instaluję..."
     if command -v apt-get >/dev/null 2>&1; then
         sudo apt-get update -y && sudo apt-get install -y build-essential python3
     elif command -v dnf >/dev/null 2>&1; then
@@ -114,58 +91,55 @@ if ! has_cxx || ! command -v make >/dev/null 2>&1 || ! command -v python3 >/dev/
     elif command -v pacman >/dev/null 2>&1; then
         sudo pacman -S --noconfirm base-devel python
     else
-        fail "Missing C++ build tools for better-sqlite3 - install a C++ compiler, make and python3, then rerun.
-   (Debian/Ubuntu: sudo apt install build-essential python3, Fedora: sudo dnf install gcc-c++ make python3)"
+        fail "Brak kompilatora C++ / make / python3 - zainstaluj i uruchom ponownie."
     fi
 fi
 if ! has_cxx || ! command -v make >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
-    fail "Native build tools still missing - install a C++ compiler, make and python3, then rerun.
-   (Debian/Ubuntu: sudo apt install build-essential python3, Fedora: sudo dnf install gcc-c++ make python3)"
+    fail "Narzędzia build dalej niedostępne - zainstaluj kompilator C++, make i python3, potem ponów."
 fi
 
-# --- Get the code (GitHub Releases) ---
+# --- Pobierz kod (już jest -> nie ściągaj) ---
 if [ -f "$INSTALL_DIR/server/index.js" ]; then
-    warn "DHM server files already present in $INSTALL_DIR - using them (no download)."
+    warn "Pliki serwera DHM już są w $INSTALL_DIR - używam ich (bez pobierania)."
 else
     mkdir -p "$INSTALL_DIR"
-    warn "Downloading DHM server bundle from GitHub Releases..."
+    warn "Pobieram bundle serwera DHM z GitHub Releases..."
     TMP_DL="$(mktemp)"
     if ! curl -fsSL --max-time 120 "$GITHUB_URL" -o "$TMP_DL" 2>/dev/null; then
         rm -f "$TMP_DL"
-        fail "Could not download the DHM bundle from $GITHUB_URL.
-   Check the internet connection / GITHUB_URL."
+        fail "Nie udało się pobrać bundle z $GITHUB_URL.
+   Sprawdź połączenie / zmienną GITHUB_URL."
     fi
     tar xzf "$TMP_DL" -C "$INSTALL_DIR" --strip-components=1
     rm -f "$TMP_DL"
 fi
-[ -f "$INSTALL_DIR/server/index.js" ] || fail "DHM server files missing in $INSTALL_DIR/server (index.js not found)."
+[ -f "$INSTALL_DIR/server/index.js" ] || fail "Brak plików serwera DHM w $INSTALL_DIR/server (brak index.js)."
 
-# --- Server dependencies ---
-ok "Installing server dependencies..."
+ok "Instaluję zależności serwera..."
 if ! (cd "$INSTALL_DIR/server" && npm install); then
-    fail "npm install failed. On Debian/Ubuntu you may need:
+    fail "npm install się nie powiodło. Na Debianie/Ubuntu może być potrzebne:
        sudo apt install build-essential python3
-       (better-sqlite3 requires a native build)"
+       (better-sqlite3 wymaga kompilacji)"
 fi
 
-# --- Dashboard (dist is committed, build it if missing) ---
+# --- Dashboard (dist jest w repo, zbuduj jeśli brak) ---
 if [ ! -d "$INSTALL_DIR/dashboard/dist" ]; then
-    warn "Dashboard build missing - building (vite)..."
+    warn "Brak builda dashboard - buduję (vite)..."
     (cd "$INSTALL_DIR/dashboard" && npm install && npm run build)
 fi
 
 # --- pm2 ---
 if ! command -v pm2 >/dev/null 2>&1; then
-    ok "Installing pm2 (global prefix needs root)..."
+    ok "Instaluję pm2 (globalny prefix wymaga root)..."
     sudo env "PATH=$PATH" npm install -g pm2
 fi
 
-# --- Access tokens ---
+# --- Tokeny ---
 gen_token() {
     command -v openssl >/dev/null 2>&1 && openssl rand -hex 24 || node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
 }
 if [ -f "$INSTALL_DIR/server/.env" ] && grep -q '^AUTH_TOKEN=' "$INSTALL_DIR/server/.env"; then
-    warn "server/.env exists - keeping existing tokens"
+    warn "server/.env istnieje - zostawiam obecne tokeny"
 else
     AUTH_TOKEN="${AUTH_TOKEN:-$(gen_token)}"
     REGISTER_TOKEN="${REGISTER_TOKEN:-$(gen_token)}"
@@ -174,7 +148,7 @@ PORT=$PORT
 AUTH_TOKEN=$AUTH_TOKEN
 REGISTER_TOKEN=$REGISTER_TOKEN
 EOF
-    ok "Generated server/.env (write + registration tokens)"
+    ok "Wygenerowano server/.env (tokeny zapisu + rejestracji)"
 fi
 mkdir -p "$INSTALL_DIR/dashboard/dist"
 AUTH_TOKEN_FINAL=$(grep '^AUTH_TOKEN=' "$INSTALL_DIR/server/.env" | cut -d= -f2-)
@@ -183,43 +157,43 @@ PORT_FINAL=$(grep '^PORT=' "$INSTALL_DIR/server/.env" | cut -d= -f2-)
 cat > "$INSTALL_DIR/dashboard/dist/config.js" <<EOF
 window.DHM_CONFIG = { token: "$AUTH_TOKEN_FINAL" };
 EOF
-ok "Dashboard config (token) generated"
+ok "Wygenerowano config dashboard (token)"
 
-# --- Start the server ---
-# PORT/tokens are read from server/.env by index.js - no need to export them.
+# --- Start ---
+# PORT/tokeny serwer czyta z server/.env - nie trzeba eksportować.
 cd "$INSTALL_DIR/server"
 pm2 start index.js --name "$PM2_NAME"
 pm2 save
-ok "Server started (pm2 name: $PM2_NAME)."
+ok "Serwer wystartował (pm2 name: $PM2_NAME)."
 
 # --- Firewall ---
 if command -v ufw >/dev/null 2>&1; then
-    ok "Opening ports in UFW..."
+    ok "Otwieram porty w UFW..."
     sudo ufw allow "$PORT_FINAL"/tcp || true
 fi
 
-# --- Autostart after reboot ---
+# --- Autostart po restarcie ---
 if [ -d /run/systemd/system ] || [ -d /etc/systemd ]; then
-    warn "Enabling systemd autostart for pm2 (may ask for sudo)..."
+    warn "Włączam autostart systemd dla pm2 (może poprosić o sudo)..."
     sudo env "PATH=$PATH" pm2 startup systemd -u "$USER" --hp "$HOME" \
-        || warn "Autostart NOT enabled - run manually: sudo env PATH=\$PATH pm2 startup systemd -u $USER --hp $HOME"
+        || warn "Autostart NIE włączony - uruchom ręcznie: sudo env PATH=\$PATH pm2 startup systemd -u $USER --hp $HOME"
 fi
 
 echo
-ok "=== DONE ==="
-# Prefer the LAN IP (route-based), fall back to hostname -I only if unavailable
+ok "=== GOTOWE ==="
+# Preferuj IP z sieci LAN (na podstawie trasy), fallback: hostname -I
 LAN_IP="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}' || true)"
 [ -z "$LAN_IP" ] && LAN_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
 echo "Dashboard:   http://${LAN_IP:-<server-IP>}:$PORT_FINAL"
-echo "Logs:        pm2 logs $PM2_NAME"
+echo "Logi:        pm2 logs $PM2_NAME"
 echo
-echo "Agents (one-liners from the README):"
+echo "Agenty (one-linery z README):"
 echo "  Linux:    curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && REGISTER_TOKEN=$REGISTER_TOKEN_FINAL sh /tmp/dhm.sh"
 echo "  Windows:  curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && %TEMP%\user-win.bat"
-echo "  Phone:    pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=$REGISTER_TOKEN_FINAL sh /tmp/setup-dhm.sh"
+echo "  Telefon:  pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=$REGISTER_TOKEN_FINAL sh /tmp/setup-dhm.sh"
 echo
 echo "REGISTER_TOKEN: $REGISTER_TOKEN_FINAL"
-echo "             (keep it secret - agents need it only for the first registration)"
+echo "             (trzymaj w sekrecie - agenty potrzebują go tylko przy rejestracji)"
 echo
-echo "Remove DHM:  scripts/uninstall-serwer.sh"
+echo "Usuwanie DHM:  scripts/uninstall-serwer.sh"
 echo
