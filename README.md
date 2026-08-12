@@ -170,8 +170,6 @@ The scripts accept variables (`SERVER_URL`, `DEVICE_NAME`, `DEVICE_TYPE`, `REPOR
 | `REPORT_INTERVAL` | agent | Reporting interval (s) | `60` (phone: `300`) |
 | `REGISTER_TOKEN` | agent | Registration token (only on first install) | — |
 
-Full list: [.env.example](.env.example).
-
 ## API
 
 Server: Node.js + Express + SQLite. Reads are **open**; writes require the `X-Auth-Token` header
@@ -249,7 +247,6 @@ device-health-monitor/
 │   ├── setup-termux.sh  ← phone agent (Termux)
 │   ├── build-release.sh ← builds the GitHub Release tarballs
 │   ├── uninstall-serwer.sh / uninstall-linux.sh / uninstall-win.bat
-├── .env.example
 ├── README.md       ← English
 └── README.pl.md    ← Polski
 ```

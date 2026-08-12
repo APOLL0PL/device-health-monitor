@@ -167,8 +167,6 @@ Skrypty przyjmują zmienne (`SERVER_URL`, `DEVICE_NAME`, `DEVICE_TYPE`, `REPORT_
 | `REPORT_INTERVAL` | agent | Interwał raportowania (s) | `60` (phone: `300`) |
 | `REGISTER_TOKEN` | agent | Token rejestracji (tylko przy pierwszej instalacji) | — |
 
-Pełna lista: [.env.example](.env.example).
-
 ## API
 
 Serwer: Node.js + Express + SQLite. Odczyt jest **otwarty**; zapis wymaga nagłówka `X-Auth-Token`
@@ -246,7 +244,6 @@ device-health-monitor/
 │   ├── setup-termux.sh  ← agent telefon (Termux)
 │   ├── build-release.sh ← buduje tarballe na GitHub Release
 │   ├── uninstall-serwer.sh / uninstall-linux.sh / uninstall-win.bat
-├── .env.example
 ├── README.md       ← English
 └── README.pl.md    ← Polski
 ```
