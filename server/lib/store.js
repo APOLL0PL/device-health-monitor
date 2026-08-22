@@ -146,7 +146,7 @@ function recordMetrics(deviceId, metrics) {
   }
 
   db.prepare(`
-    UPDATE devices SET last_seen = datetime('now','localtime'), is_online = 1 WHERE id = ?
+    UPDATE devices SET last_seen = datetime('now'), is_online = 1 WHERE id = ?
   `).run(deviceId);
 
   checkAlerts(deviceId, metrics);
@@ -156,7 +156,7 @@ function recordMetrics(deviceId, metrics) {
 function getMetrics(deviceId, hours = 24) {
   return db.prepare(`
     SELECT * FROM metrics
-    WHERE device_id = ? AND timestamp > datetime('now','localtime', ?)
+    WHERE device_id = ? AND timestamp > datetime('now', ?)
     ORDER BY timestamp ASC
   `).all(deviceId, `-${hours} hours`);
 }
@@ -195,7 +195,7 @@ function checkAlerts(deviceId, metrics) {
   if (metrics.cpu_percent > THRESHOLDS.cpu_percent) {
     const recent = db.prepare(`
       SELECT COUNT(*) as cnt FROM metrics
-      WHERE device_id = ? AND cpu_percent > ? AND timestamp > datetime('now','localtime', ?)
+      WHERE device_id = ? AND cpu_percent > ? AND timestamp > datetime('now', ?)
     `).get(deviceId, THRESHOLDS.cpu_percent, `-${THRESHOLDS.cpu_duration_minutes} minutes`);
 
     if (recent.cnt >= THRESHOLDS.cpu_duration_minutes * 2) {
@@ -223,7 +223,7 @@ function checkAlerts(deviceId, metrics) {
 function checkOfflineDevices() {
   db.prepare(`
     UPDATE devices SET is_online = 0
-    WHERE is_online = 1 AND last_seen < datetime('now','localtime', ?)
+    WHERE is_online = 1 AND last_seen < datetime('now', ?)
   `).run(`-${THRESHOLDS.offline_minutes} minutes`);
 }
 
@@ -249,14 +249,14 @@ function getAlert(id) {
 }
 
 function resolveAlert(id) {
-  db.prepare("UPDATE alerts SET resolved_at = datetime('now','localtime') WHERE id = ?").run(id);
+  db.prepare("UPDATE alerts SET resolved_at = datetime('now') WHERE id = ?").run(id);
 }
 
 function pruneOldMetrics() {
   const now = Date.now();
   if (now - lastPrune < 3_600_000) return;
   lastPrune = now;
-  db.prepare("DELETE FROM metrics WHERE timestamp < datetime('now','localtime', '-30 days')").run();
+  db.prepare("DELETE FROM metrics WHERE timestamp < datetime('now', '-30 days')").run();
 }
 
 function getDeviceSummary() {

@@ -6,7 +6,7 @@ const TOKEN = window.DHM_CONFIG?.token;
 
 function timeAgo(dateStr) {
   if (!dateStr) return 'nigdy';
-  const diff = (Date.now() - new Date(dateStr + 'Z').getTime()) / 1000;
+  const diff = Math.max(0, (Date.now() - new Date(dateStr + 'Z').getTime()) / 1000);
   if (diff < 60) return `${Math.floor(diff)}s temu`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m temu`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h temu`;
