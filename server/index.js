@@ -23,6 +23,8 @@ import {
   removeDevice,
   resolveAlert,
   updateDeviceMeta,
+  setThresholds,
+  getThresholds,
 } from './lib/store.js';
 import { start as selfmonitorStart } from './lib/selfmonitor.js';
 
@@ -161,7 +163,16 @@ app.get('/api/devices/:id', (req, res) => {
   if (!row) return res.status(404).json({ error: 'Not found' });
   const device = publicDevice(row);
   const metrics = getLatestMetrics(device.id);
-  res.json({ device, metrics });
+  const thresholds = getThresholds(device.id);
+  res.json({ device, metrics, thresholds });
+});
+
+app.patch('/api/devices/:id/thresholds', limiterWrite, authWrite, (req, res) => {
+  const id = Number(req.params.id);
+  if (!getDevice(id)) return res.status(404).json({ error: 'Not found' });
+  setThresholds(id, req.body || {});
+  broadcast({ type: 'device_update', device: publicDevice(getDevice(id)) });
+  res.json({ ok: true, thresholds: getThresholds(id) });
 });
 
 app.get('/api/devices/:id/metrics', (req, res) => {

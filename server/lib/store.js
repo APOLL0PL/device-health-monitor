@@ -168,24 +168,52 @@ function getLatestMetrics(deviceId) {
   `).get(deviceId);
 }
 
+function getThresholds(deviceId) {
+  const row = db.prepare('SELECT * FROM device_thresholds WHERE device_id = ?').get(deviceId);
+  const merged = { ...THRESHOLDS };
+  if (row) {
+    for (const k of ['disk_percent', 'disk_critical_percent', 'temperature_c', 'cpu_percent', 'cpu_duration_minutes']) {
+      const v = row[k];
+      if (v !== null && v !== undefined && Number.isFinite(Number(v))) merged[k] = Number(v);
+    }
+  }
+  return merged;
+}
+
+function setThresholds(deviceId, patch = {}) {
+  const keys = ['disk_percent', 'disk_critical_percent', 'temperature_c', 'cpu_percent', 'cpu_duration_minutes'];
+  const existing = db.prepare('SELECT * FROM device_thresholds WHERE device_id = ?').get(deviceId) || {};
+  const next = {};
+  for (const k of keys) {
+    if (patch[k] === undefined) next[k] = existing[k] ?? null;
+    else if (patch[k] === null || patch[k] === '') next[k] = null;
+    else next[k] = num(patch[k], existing[k] ?? null);
+  }
+  db.prepare(`
+    INSERT OR REPLACE INTO device_thresholds (device_id, ${keys.join(', ')})
+    VALUES (?, ${keys.map(() => '?').join(', ')})
+  `).run(deviceId, ...keys.map((k) => next[k]));
+}
+
 function checkAlerts(deviceId, metrics) {
   const device = getDevice(deviceId);
   if (!device) return;
 
+  const TH = getThresholds(deviceId);
   const newAlerts = [];
 
   if (metrics.disk_total_gb > 0) {
     const diskPercent = (metrics.disk_used_gb / metrics.disk_total_gb) * 100;
-    if (diskPercent > THRESHOLDS.disk_percent) {
+    if (diskPercent > TH.disk_percent) {
       newAlerts.push({
         type: 'disk_full',
         message: `${device.name}: dysk ${diskPercent.toFixed(1)}% (${metrics.disk_used_gb.toFixed(1)}/${metrics.disk_total_gb.toFixed(1)} GB)`,
-        severity: diskPercent > THRESHOLDS.disk_critical_percent ? 'critical' : 'warning',
+        severity: diskPercent > TH.disk_critical_percent ? 'critical' : 'warning',
       });
     }
   }
 
-  if (metrics.temperature_c && metrics.temperature_c > THRESHOLDS.temperature_c) {
+  if (metrics.temperature_c && metrics.temperature_c > TH.temperature_c) {
     newAlerts.push({
       type: 'high_temp',
       message: `${device.name}: temperatura ${metrics.temperature_c}°C`,
@@ -193,16 +221,16 @@ function checkAlerts(deviceId, metrics) {
     });
   }
 
-  if (metrics.cpu_percent > THRESHOLDS.cpu_percent) {
+  if (metrics.cpu_percent > TH.cpu_percent) {
     const recent = db.prepare(`
       SELECT COUNT(*) as cnt FROM metrics
       WHERE device_id = ? AND cpu_percent > ? AND timestamp > datetime('now', ?)
-    `).get(deviceId, THRESHOLDS.cpu_percent, `-${THRESHOLDS.cpu_duration_minutes} minutes`);
+    `).get(deviceId, TH.cpu_percent, `-${TH.cpu_duration_minutes} minutes`);
 
-    if (recent.cnt >= THRESHOLDS.cpu_duration_minutes * 2) {
+    if (recent.cnt >= TH.cpu_duration_minutes * 2) {
       newAlerts.push({
         type: 'high_cpu',
-        message: `${device.name}: CPU ${metrics.cpu_percent}% przez >${THRESHOLDS.cpu_duration_minutes}min`,
+        message: `${device.name}: CPU ${metrics.cpu_percent}% przez >${TH.cpu_duration_minutes}min`,
         severity: 'warning',
       });
     }
@@ -276,6 +304,8 @@ export {
   getDevice,
   getDeviceByKey,
   updateDeviceMeta,
+  setThresholds,
+  getThresholds,
   removeDevice,
   recordMetrics,
   getMetrics,

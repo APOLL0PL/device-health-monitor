@@ -50,6 +50,16 @@ db.exec(`
     FOREIGN KEY (device_id) REFERENCES devices(id)
   );
 
+  CREATE TABLE IF NOT EXISTS device_thresholds (
+    device_id INTEGER PRIMARY KEY,
+    disk_percent REAL,
+    disk_critical_percent REAL,
+    temperature_c REAL,
+    cpu_percent REAL,
+    cpu_duration_minutes INTEGER,
+    FOREIGN KEY (device_id) REFERENCES devices(id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_metrics_device_time ON metrics(device_id, timestamp);
   CREATE INDEX IF NOT EXISTS idx_alerts_active ON alerts(resolved_at);
 `);

@@ -1,8 +1,66 @@
 import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { Clock } from 'lucide-react';
+import { Clock, SlidersHorizontal } from 'lucide-react';
 
 const DISK_COLORS = ['#a855f7', '#22c55e', '#3b82f6', '#f97316', '#eab308', '#ef4444', '#14b8a6', '#8b5cf6'];
+
+const THRESHOLD_FIELDS = [
+  ['disk_percent', 'Dysk %'],
+  ['temperature_c', 'Temp °C'],
+  ['cpu_percent', 'CPU %'],
+  ['cpu_duration_minutes', 'CPU min'],
+];
+
+function ThresholdsPanel({ deviceId }) {
+  const [values, setValues] = useState(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/devices/${deviceId}`).then(r => r.json()).then(d => {
+      setValues({
+        disk_percent: d.thresholds?.disk_percent ?? '',
+        temperature_c: d.thresholds?.temperature_c ?? '',
+        cpu_percent: d.thresholds?.cpu_percent ?? '',
+        cpu_duration_minutes: d.thresholds?.cpu_duration_minutes ?? '',
+      });
+    }).catch(() => {});
+  }, [deviceId]);
+
+  const save = async () => {
+    await fetch(`/api/devices/${deviceId}/thresholds`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(window.DHM_CONFIG?.token ? { 'X-Auth-Token': window.DHM_CONFIG.token } : {}),
+      },
+      body: JSON.stringify(values),
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  if (!values) return null;
+  return (
+    <div className="thresholds-panel">
+      <h3><SlidersHorizontal size={12} /> Progi alertów</h3>
+      <div className="thresholds-row">
+        {THRESHOLD_FIELDS.map(([key, label]) => (
+          <label key={key} className="threshold-field">
+            <span>{label}</span>
+            <input
+              type="number"
+              value={values[key]}
+              onChange={e => setValues({ ...values, [key]: e.target.value })}
+              onKeyDown={e => e.key === 'Enter' && save()}
+            />
+          </label>
+        ))}
+        <button className="threshold-save" onClick={save}>{saved ? 'Zapisano ✓' : 'Zapisz'}</button>
+      </div>
+      <p className="thresholds-hint">Puste pole = wartość domyślna (dysk 90%, temp 70°C, CPU 90%/5 min)</p>
+    </div>
+  );
+}
 
 export default function DeviceDetail({ deviceId, api }) {
   const [device, setDevice] = useState(null);
@@ -70,6 +128,8 @@ export default function DeviceDetail({ deviceId, api }) {
           ))}
         </div>
       </div>
+
+      <ThresholdsPanel deviceId={deviceId} />
 
       {device.last_disks?.length > 0 && (
         <div className="disks-panel">
