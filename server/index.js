@@ -244,6 +244,48 @@ app.post('/api/alerts/:id/resolve', limiterWrite, authWrite, (req, res) => {
   res.json({ ok: true });
 });
 
+// Prometheus exposition format (LAN only, read-only)
+app.get('/metrics', (req, res) => {
+  const rows = getAllDevices().map((d) => {
+    const device = publicDevice(d);
+    let disks = [];
+    const m = getLatestMetrics(device.id);
+    try { if (m?.disks_json) disks = JSON.parse(m.disks_json); } catch {}
+    return { device, m, disks };
+  });
+  const lines = [];
+  const esc = (s) => String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const labels = (d) => `device="${esc(d.name)}",ip="${esc(d.ip)}",type="${esc(d.type)}",group="${esc(d.grp || '')}"`;
+  const emit = (name, help, fn) => {
+    lines.push(`# HELP ${name} ${help}`, `# TYPE ${name} gauge`);
+    for (const { device, m, disks } of rows) {
+      const v = fn({ device, m, disks });
+      if (v != null) lines.push(`${name}{${labels(device)}} ${v}`);
+    }
+  };
+
+  emit('dhm_device_online', '1 if device reported recently', ({ device }) => (device.is_online ? 1 : 0));
+  emit('dhm_cpu_percent', 'CPU usage percent', ({ m }) => m?.cpu_percent);
+  emit('dhm_ram_used_mb', 'RAM used MB', ({ m }) => m?.ram_used_mb);
+  emit('dhm_ram_total_mb', 'RAM total MB', ({ m }) => m?.ram_total_mb);
+  emit('dhm_disk_used_gb', 'Disk used GB (system + /home)', ({ m }) => m?.disk_used_gb);
+  emit('dhm_temperature_celsius', 'Temperature C', ({ m }) => m?.temperature_c);
+  emit('dhm_uptime_seconds', 'Uptime seconds', ({ m }) => m?.uptime_seconds);
+  emit('dhm_battery_percent', 'Battery percent', ({ m }) => m?.battery_percent);
+
+  lines.push('# HELP dhm_disk_mount_used_gb Per-mount disk used GB', '# TYPE dhm_disk_mount_used_gb gauge');
+  lines.push('# HELP dhm_disk_mount_total_gb Per-mount disk total GB', '# TYPE dhm_disk_mount_total_gb gauge');
+  for (const { device, disks } of rows) {
+    for (const dsk of disks) {
+      const extra = `mount="${esc(dsk.mount)}"`;
+      if (dsk.used_gb != null) lines.push(`dhm_disk_mount_used_gb{${labels(device)},${extra}} ${dsk.used_gb}`);
+      if (dsk.total_gb != null) lines.push(`dhm_disk_mount_total_gb{${labels(device)},${extra}} ${dsk.total_gb}`);
+    }
+  }
+
+  res.type('text/plain; version=0.0.4; charset=utf-8').send(lines.join('\n') + '\n');
+});
+
 // SPA fallback
 app.get('/*splat', (req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/dist/index.html'));
