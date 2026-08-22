@@ -90,6 +90,13 @@ header h1 { font-size: 1.2rem; font-weight: 600; }
 .device-detail { flex: 1; padding: 20px 24px; overflow-y: auto; }
 .detail-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
 .detail-header h2 { font-size: 1.4rem; }
+
+.disks-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 20px; }
+.disks-panel h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); margin-bottom: 10px; }
+.disk-row { display: grid; grid-template-columns: minmax(110px, auto) 70px 1fr minmax(150px, auto); align-items: center; gap: 12px; padding: 6px 0; font-size: 0.8rem; }
+.disk-mount { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.disk-fs { color: var(--text2); font-size: 0.7rem; text-transform: uppercase; }
+.disk-cap { color: var(--text2); font-size: 0.75rem; white-space: nowrap; text-align: right; }
 .time-selector { display: flex; gap: 4px; margin-left: auto; }
 .time-selector button { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
 .time-selector button.active { background: var(--accent); color: white; border-color: var(--accent); }

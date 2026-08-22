@@ -54,6 +54,26 @@ export default function DeviceDetail({ deviceId, api }) {
         </div>
       </div>
 
+      {device.last_disks?.length > 0 && (
+        <div className="disks-panel">
+          <h3>Dyski ({device.last_disks.length})</h3>
+          {device.last_disks.map((d) => {
+            const pct = d.total_gb > 0 ? (d.used_gb / d.total_gb) * 100 : 0;
+            const color = pct > 95 ? 'var(--crit)' : pct > 80 ? 'var(--warn)' : 'var(--ok)';
+            return (
+              <div key={d.mount} className="disk-row">
+                <span className="disk-mount">{d.mount}</span>
+                <span className="disk-fs">{d.fs}</span>
+                <div className="gauge-bar">
+                  <div className="gauge-fill" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: color }} />
+                </div>
+                <span className="disk-cap">{d.used_gb} / {d.total_gb} GB ({Math.round(pct)}%)</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {metrics.length === 0 ? (
         <div className="empty-state">Brak danych — poczekaj na raport agenta</div>
       ) : (
