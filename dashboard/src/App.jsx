@@ -4,7 +4,7 @@ import DeviceCard from './components/DeviceCard';
 import DeviceDetail from './components/DeviceDetail';
 import AlertsPanel from './components/AlertsPanel';
 import AddDevicePanel from './components/AddDevicePanel';
-import { LangProvider, useT } from './i18n.jsx';
+import { LangProvider, makeT } from './i18n.jsx';
 
 const API = '';
 const TOKEN = window.DHM_CONFIG?.token;
@@ -41,7 +41,7 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [groupFilter, setGroupFilter] = useState('');
   const [lang, setLang] = useState(() => localStorage.getItem('lang') || 'pl');
-  const t = useT();
+  const t = makeT(lang);
 
   const fetchData = useCallback(async () => {
     const [devData, alertData] = await Promise.all([

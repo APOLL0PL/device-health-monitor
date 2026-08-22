@@ -103,12 +103,16 @@ export function LangProvider({ lang, children }) {
   return <LangContext.Provider value={lang}>{children}</LangContext.Provider>;
 }
 
-// zwraca funkcje t(key, params) - params np. { mount: '/' }
-export function useT() {
-  const lang = useContext(LangContext);
+// t z konkretnego jezyka - dla komponentow NAD providerem (App)
+export function makeT(lang) {
   const dict = STRINGS[lang] || STRINGS.pl;
   return (key, params = {}) =>
     String(dict[key] ?? STRINGS.pl[key] ?? key).replace(/\{(\w+)\}/g, (_, k) => params[k] ?? `{${k}}`);
+}
+
+// zwraca funkcje t(key, params) - params np. { mount: '/' }
+export function useT() {
+  return makeT(useContext(LangContext));
 }
 
 export function useLang() {
