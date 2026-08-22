@@ -105,8 +105,8 @@ function recordMetrics(deviceId, metrics) {
     INSERT INTO metrics (device_id, cpu_percent, ram_used_mb, ram_total_mb, ram_cache_mb,
       disk_used_gb, disk_total_gb, disk_sys_used_gb, disk_sys_total_gb,
       temperature_c, uptime_seconds,
-      net_in_bytes, net_out_bytes, disks_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      net_in_bytes, net_out_bytes, disks_json, battery_percent, battery_charging)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -126,7 +126,12 @@ function recordMetrics(deviceId, metrics) {
     Math.floor(clamp(metrics.uptime_seconds, 0, 1e12, 0)),
     clamp(metrics.net_in_bytes, 0, 1e18, 0),
     clamp(metrics.net_out_bytes, 0, 1e18, 0),
-    disksJson
+    disksJson,
+    (() => {
+      const b = num(metrics.battery_percent);
+      return b !== null && b >= 0 && b <= 100 ? b : null;
+    })(),
+    metrics.battery_charging === 1 || metrics.battery_charging === true ? 1 : null
   );
 
   if (typeof metrics.ip === 'string' && metrics.ip.length <= 64 && metrics.ip !== '127.0.0.1') {

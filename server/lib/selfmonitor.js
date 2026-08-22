@@ -89,12 +89,13 @@ async function getTemperature() {
 }
 
 async function getMetrics() {
-  const [cpu, mem, disks, net, temperature] = await Promise.all([
+  const [cpu, mem, disks, net, temperature, battery] = await Promise.all([
     si.currentLoad(),
     si.mem(),
     si.fsSize(),
     getNetworkTotals(),
     getTemperature(),
+    si.battery().catch(() => null),
   ]);
 
   const mainDisk = disks.find((d) => d.mount === '/') || disks[0] || {};
@@ -115,6 +116,9 @@ async function getMetrics() {
     uptime_seconds: Math.floor(os.uptime()),
     net_in_bytes: net.rx,
     net_out_bytes: net.tx,
+    ...(battery?.hasBattery && Number.isFinite(battery.percent)
+      ? { battery_percent: Math.round(battery.percent), battery_charging: battery.isCharging ? 1 : 0 }
+      : {}),
     disks: getAllDisks(disks),
   };
 }

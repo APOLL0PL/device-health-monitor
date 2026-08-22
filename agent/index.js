@@ -99,13 +99,24 @@ async function getTemperature() {
   return null;
 }
 
+async function getBattery() {
+  try {
+    const b = await si.battery();
+    if (!b || !b.hasBattery || !Number.isFinite(b.percent)) return null;
+    return { percent: b.percent, charging: b.isCharging ? 1 : 0 };
+  } catch {
+    return null;
+  }
+}
+
 async function getMetrics() {
-  const [cpu, mem, disks, net, temperature] = await Promise.all([
+  const [cpu, mem, disks, net, temperature, battery] = await Promise.all([
     si.currentLoad(),
     si.mem(),
     si.fsSize(),
     getNetworkTotals(),
     getTemperature(),
+    getBattery(),
   ]);
 
   const isWin = os.platform() === 'win32';
@@ -129,6 +140,7 @@ async function getMetrics() {
     uptime_seconds: Math.floor(os.uptime()),
     net_in_bytes: net.rx,
     net_out_bytes: net.tx,
+    ...(battery ? { battery_percent: Math.round(battery.percent), battery_charging: battery.charging } : {}),
     disks: await getAllDisks(disks),
   };
 }

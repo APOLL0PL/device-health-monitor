@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Monitor, Terminal, Smartphone, Server, ThermometerSun, Pencil, Check, X, ArrowDown, ArrowUp } from 'lucide-react';
+import { Monitor, Terminal, Smartphone, Server, ThermometerSun, Pencil, Check, X, ArrowDown, ArrowUp, Battery, BatteryCharging } from 'lucide-react';
 
 const API = '';
 const TOKEN = window.DHM_CONFIG?.token;
@@ -161,6 +161,12 @@ export default function DeviceCard({ device, units, onClick }) {
           {device.last_temp != null && (
             <div className="temp-badge" style={{ color: tempColor }}>
               <ThermometerSun size={14} strokeWidth={1.5} /> {device.last_temp}°C
+            </div>
+          )}
+          {device.last_battery != null && (
+            <div className="temp-badge" style={{ color: device.last_battery <= 20 && !device.last_battery_charging ? 'var(--crit)' : 'var(--text2)' }}>
+              {device.last_battery_charging ? <BatteryCharging size={14} strokeWidth={1.5} /> : <Battery size={14} strokeWidth={1.5} />}
+              {' '}{device.last_battery}%
             </div>
           )}
           {(device.last_net_in != null || device.last_net_out != null) && (

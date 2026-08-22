@@ -143,6 +143,8 @@ app.get('/api/devices', (req, res) => {
       last_disks: (() => {
         try { return m?.disks_json ? JSON.parse(m.disks_json) : null; } catch { return null; }
       })(),
+      last_battery: m?.battery_percent ?? null,
+      last_battery_charging: m?.battery_charging ?? null,
       os_name: d.os_name ?? 'unknown',
       mac: d.mac ?? null,
     };
