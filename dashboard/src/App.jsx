@@ -25,10 +25,15 @@ async function apiWrite(path, method, body) {
   return res.json();
 }
 
+const parseHash = () => {
+  const m = window.location.hash.match(/^#\/device\/(\d+)$/);
+  return m ? Number(m[1]) : null;
+};
+
 export default function App() {
   const [devices, setDevices] = useState([]);
   const [summary, setSummary] = useState({ total: 0, online: 0, offline: 0, activeAlerts: 0 });
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(parseHash);
   const [alerts, setAlerts] = useState([]);
   const [dark, setDark] = useState(() => localStorage.getItem('theme') !== 'light');
   const [units, setUnits] = useState(() => localStorage.getItem('units') || 'pct');
@@ -42,6 +47,19 @@ export default function App() {
     setDevices(devData.devices || []);
     setSummary(devData.summary || { total: 0, online: 0, offline: 0, activeAlerts: 0 });
     setAlerts(alertData.alerts || []);
+  }, []);
+
+  const openDevice = useCallback((id) => {
+    setSelected(id);
+    window.location.hash = `#/device/${id}`;
+  }, []);
+
+  const closeDevice = useCallback(() => {
+    if (window.location.hash.startsWith('#/device/')) {
+      window.history.back();
+    } else {
+      setSelected(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -74,6 +92,19 @@ export default function App() {
     localStorage.setItem('units', units);
   }, [units]);
 
+  useEffect(() => {
+    const sync = () => setSelected(parseHash());
+    window.addEventListener('popstate', sync);
+    window.addEventListener('hashchange', sync);
+    const onKey = (e) => { if (e.key === 'Escape') closeDevice(); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('popstate', sync);
+      window.removeEventListener('hashchange', sync);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [closeDevice]);
+
   const resolveAlert = async (id) => {
     await apiWrite(`/api/alerts/${id}/resolve`, 'POST');
     fetchData();
@@ -83,7 +114,7 @@ export default function App() {
     return (
       <div className="app">
         <header>
-          <button className="btn-back" onClick={() => setSelected(null)}>
+          <button className="btn-back" onClick={closeDevice}>
             <MonitorDot size={16} /> Wstecz
           </button>
           <h1>Device Health Monitor</h1>
@@ -142,7 +173,7 @@ export default function App() {
             </div>
           )}
           {devices.map((d) => (
-            <DeviceCard key={d.id} device={d} units={units} onClick={() => setSelected(d.id)} />
+            <DeviceCard key={d.id} device={d} units={units} onClick={() => openDevice(d.id)} />
           ))}
         </main>
 
