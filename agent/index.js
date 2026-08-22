@@ -16,7 +16,7 @@ const REGISTER_TOKEN = process.env.REGISTER_TOKEN || '';
 const KEY_FILE = path.join(__dirname, '.api_key');
 
 function isVirtualIface(name) {
-  return /^(br-|veth|docker|virbr|zbr|tun|vpn|tap)/.test(name);
+  return /^(br-|veth|docker|virbr|zbr|tun|vpn|tap|wg)/.test(name);
 }
 
 function getLocalIp() {
@@ -166,12 +166,17 @@ async function main() {
 
   let apiKey = fs.existsSync(KEY_FILE) ? fs.readFileSync(KEY_FILE, 'utf8').trim() : null;
   if (!apiKey) {
-    apiKey = await register(apiKey);
+    if (getLocalIp() === '127.0.0.1') {
+      console.log('Brak LAN IP - rejestracja odwleczona do nastepnego cyklu');
+    } else {
+      apiKey = await register(apiKey);
+    }
   }
 
   await report(apiKey);
   setInterval(async () => {
     apiKey = await report(apiKey);
+    if (!apiKey && getLocalIp() !== '127.0.0.1') apiKey = await register(apiKey);
   }, INTERVAL);
 }
 

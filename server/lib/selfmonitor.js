@@ -8,7 +8,7 @@ const DEVICE_NAME = process.env.SELF_DEVICE_NAME || os.hostname();
 let selfDeviceId = null;
 
 function isVirtualIface(name) {
-  return /^(br-|veth|docker|virbr|zbr|tun|vpn|tap)/.test(name);
+  return /^(br-|veth|docker|virbr|zbr|tun|vpn|tap|wg)/.test(name);
 }
 
 function getLocalIp() {
@@ -104,7 +104,9 @@ async function getMetrics() {
 
 function ensureRegistered() {
   if (selfDeviceId) return;
-  const dev = registerDevice(DEVICE_NAME, getLocalIp(), 'server', os.platform(), getMac());
+  const ip = getLocalIp();
+  if (ip === '127.0.0.1') return; // brak LAN IP (boot przed DHCP) - ponow w nastepnym cyklu
+  const dev = registerDevice(DEVICE_NAME, ip, 'server', os.platform(), getMac());
   if (dev) selfDeviceId = dev.id;
 }
 
