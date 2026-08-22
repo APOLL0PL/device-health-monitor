@@ -43,7 +43,8 @@ header h1 { font-size: 1.2rem; font-weight: 600; }
 .group-chip-btn:hover { border-color: var(--accent); color: var(--text); }
 .group-chip-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .group-chip { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; background: var(--bg3); color: var(--text2); border-radius: 999px; padding: 1px 8px; }
-.grp-input { width: 90px !important; font-weight: 400 !important; }
+.grp-input { flex: 0 1 auto; width: 110px !important; font-weight: 400 !important; }
+.name-edit .btn-icon { flex: 0 0 auto; }
 
 /* Grid */
 .device-grid { flex: 1; padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; align-content: start; }
@@ -58,8 +59,8 @@ header h1 { font-size: 1.2rem; font-weight: 600; }
 .device-ip { color: var(--text2); font-size: 0.8rem; }
 .device-info { flex: 1; min-width: 0; }
 .device-name-row { display: flex; align-items: center; gap: 6px; }
-.name-edit { display: flex; align-items: center; gap: 4px; }
-.name-input { background: var(--bg3); border: 1px solid var(--accent); border-radius: 4px; color: var(--text); padding: 2px 6px; font-size: 0.95rem; font-weight: 600; width: 140px; outline: none; }
+.name-edit { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.name-input { background: var(--bg3); border: 1px solid var(--accent); border-radius: 4px; color: var(--text); padding: 2px 6px; font-size: 0.95rem; font-weight: 600; width: 120px; min-width: 0; flex: 1 1 auto; outline: none; }
 .btn-icon { background: none; border: 1px solid var(--border); color: var(--text2); width: 24px; height: 24px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .btn-icon:hover { background: var(--bg3); color: var(--text); }
 .btn-icon.save { color: var(--ok); }
