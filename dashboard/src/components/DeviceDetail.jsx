@@ -6,10 +6,10 @@ import { useT, useLang, localeOf } from '../i18n.jsx';
 const DISK_COLORS = ['#a855f7', '#22c55e', '#3b82f6', '#f97316', '#eab308', '#ef4444', '#14b8a6', '#8b5cf6'];
 
 const THRESHOLD_FIELDS = [
-  ['disk_percent', t('thrDisk')],
-  ['temperature_c', t('thrTemp')],
-  ['cpu_percent', t('thrCpu')],
-  ['cpu_duration_minutes', t('thrCpuMin')],
+  ['disk_percent', 'thrDisk'],
+  ['temperature_c', 'thrTemp'],
+  ['cpu_percent', 'thrCpu'],
+  ['cpu_duration_minutes', 'thrCpuMin'],
 ];
 
 function ThresholdsPanel({ deviceId }) {
@@ -46,9 +46,9 @@ function ThresholdsPanel({ deviceId }) {
     <div className="thresholds-panel">
       <h3><SlidersHorizontal size={12} /> {t('thresholds')}</h3>
       <div className="thresholds-row">
-        {THRESHOLD_FIELDS.map(([key, label]) => (
+        {THRESHOLD_FIELDS.map(([key, labelKey]) => (
           <label key={key} className="threshold-field">
-            <span>{label}</span>
+            <span>{t(labelKey)}</span>
             <input
               type="number"
               value={values[key]}
