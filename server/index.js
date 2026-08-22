@@ -140,6 +140,9 @@ app.get('/api/devices', (req, res) => {
       last_disk_sys_total: m?.disk_sys_total_gb ?? null,
       last_net_in: m?.net_in_bytes ?? null,
       last_net_out: m?.net_out_bytes ?? null,
+      last_disks: (() => {
+        try { return m?.disks_json ? JSON.parse(m.disks_json) : null; } catch { return null; }
+      })(),
       os_name: d.os_name ?? 'unknown',
       mac: d.mac ?? null,
     };

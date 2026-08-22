@@ -128,30 +128,45 @@ export default function DeviceCard({ device, units, onClick }) {
           {device.last_ram_cache > 0 && (
             <div className="cache-info">Cache: {fmtMb(device.last_ram_cache)}</div>
           )}
-          <div className="disk-boxes">
+          {device.last_disks?.length ? device.last_disks.map((d) => (
             <Gauge
-              label="Dysk — zajętość"
-              value={device.last_disk_used}
-              max={device.last_disk_total}
+              key={d.mount}
+              label={`Dysk ${d.mount}${d.fs ? ` (${d.fs})` : ''}`}
+              value={d.used_gb}
+              max={d.total_gb}
               display={abs
-                ? `${device.last_disk_used != null ? device.last_disk_used : '—'} / ${device.last_disk_total != null ? device.last_disk_total : '—'} GB`
+                ? `${d.used_gb != null ? d.used_gb : '—'} / ${d.total_gb != null ? d.total_gb : '—'} GB`
                 : null}
+              sub={`${d.used_gb} / ${d.total_gb} GB`}
               warn={80}
               crit={95}
             />
-            <div className="disk-usage">
-              <div className="disk-usage-title">Dysk — użycie</div>
-              <div className="disk-usage-value">
-                {device.last_disk_used != null ? `${device.last_disk_used} GB` : '—'}
+          )) : (
+            <div className="disk-boxes">
+              <Gauge
+                label="Dysk — zajętość"
+                value={device.last_disk_used}
+                max={device.last_disk_total}
+                display={abs
+                  ? `${device.last_disk_used != null ? device.last_disk_used : '—'} / ${device.last_disk_total != null ? device.last_disk_total : '—'} GB`
+                  : null}
+                warn={80}
+                crit={95}
+              />
+              <div className="disk-usage">
+                <div className="disk-usage-title">Dysk — użycie</div>
+                <div className="disk-usage-value">
+                  {device.last_disk_used != null ? `${device.last_disk_used} GB` : '—'}
+                </div>
+                <div className="disk-usage-total">
+                  z {device.last_disk_total != null ? `${device.last_disk_total} GB` : '—'}
+                </div>
+                {device.last_disk_sys_used != null && device.last_disk_sys_total > 0 && (
+                  <div className="disk-usage-sys">sys: {device.last_disk_sys_used} / {device.last_disk_sys_total} GB</div>
+                )}
               </div>
-              <div className="disk-usage-total">
-                z {device.last_disk_total != null ? `${device.last_disk_total} GB` : '—'}
-              </div>
-              {device.last_disk_sys_used != null && device.last_disk_sys_total > 0 && (
-                <div className="disk-usage-sys">sys: {device.last_disk_sys_used} / {device.last_disk_sys_total} GB</div>
-              )}
             </div>
-          </div>
+          )}
           {device.last_temp != null && (
             <div className="temp-badge" style={{ color: tempColor }}>
               <ThermometerSun size={14} strokeWidth={1.5} /> {device.last_temp}°C

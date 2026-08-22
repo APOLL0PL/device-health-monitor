@@ -90,12 +90,23 @@ function removeDevice(id) {
 }
 
 function recordMetrics(deviceId, metrics) {
+  let disksJson = null;
+  if (Array.isArray(metrics.disks)) {
+    const clean = metrics.disks.slice(0, 8).map((d) => ({
+      mount: String(d?.mount ?? '').slice(0, 32),
+      fs: String(d?.fs ?? '').slice(0, 16),
+      used_gb: clamp(d?.used_gb, 0, 1e9, null),
+      total_gb: clamp(d?.total_gb, 0, 1e9, null),
+    })).filter((d) => d.mount && d.total_gb != null);
+    if (clean.length) disksJson = JSON.stringify(clean);
+  }
+
   const stmt = db.prepare(`
     INSERT INTO metrics (device_id, cpu_percent, ram_used_mb, ram_total_mb, ram_cache_mb,
       disk_used_gb, disk_total_gb, disk_sys_used_gb, disk_sys_total_gb,
       temperature_c, uptime_seconds,
-      net_in_bytes, net_out_bytes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      net_in_bytes, net_out_bytes, disks_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -114,7 +125,8 @@ function recordMetrics(deviceId, metrics) {
     })(),
     Math.floor(clamp(metrics.uptime_seconds, 0, 1e12, 0)),
     clamp(metrics.net_in_bytes, 0, 1e18, 0),
-    clamp(metrics.net_out_bytes, 0, 1e18, 0)
+    clamp(metrics.net_out_bytes, 0, 1e18, 0),
+    disksJson
   );
 
   if (typeof metrics.ip === 'string' && metrics.ip.length <= 64 && metrics.ip !== '127.0.0.1') {

@@ -19,6 +19,22 @@ function isVirtualIface(name) {
   return /^(br-|veth|docker|virbr|zbr|tun|vpn|tap|wg)/.test(name);
 }
 
+const DISK_FS_SKIP = /^(tmpfs|devtmpfs|squashfs|overlay|efivarfs|bpf|cgroup|proc|sysfs|tracefs|debugfs|configfs|fusectl|hugetlbfs|mqueue|ramfs|iso9660)/;
+
+async function getAllDisks(fsDisks) {
+  return fsDisks
+    .filter((d) => d.size >= 1073741824
+      && !DISK_FS_SKIP.test(String(d.type || ''))
+      && !DISK_FS_SKIP.test(String(d.fs || '')))
+    .slice(0, 8)
+    .map((d) => ({
+      mount: d.mount,
+      fs: d.type || d.fs,
+      used_gb: Math.round((d.used / 1073741824) * 10) / 10,
+      total_gb: Math.round((d.size / 1073741824) * 10) / 10,
+    }));
+}
+
 function getLocalIp() {
   const nets = os.networkInterfaces();
   let lan = null;
@@ -110,6 +126,7 @@ async function getMetrics() {
     uptime_seconds: Math.floor(os.uptime()),
     net_in_bytes: net.rx,
     net_out_bytes: net.tx,
+    disks: await getAllDisks(disks),
   };
 }
 
