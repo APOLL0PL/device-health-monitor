@@ -12,9 +12,17 @@ rem Zmienne: SERVER_URL, DEVICE_NAME, DEVICE_TYPE,
 rem          REPORT_INTERVAL, REGISTER_TOKEN
 rem ============================================================
 
-rem ---- adres serwera: env -> prompt (auto-detekcja niemozliwa w .bat) ----
-if "%SERVER_URL%"=="" set /p "SERVER_URL=Adres serwera DHM (http://IP:4000) [http://192.168.0.10:4000]: "
-if "%SERVER_URL%"=="" set "SERVER_URL=http://192.168.0.10:4000"
+rem ---- adres serwera: env -> prompt (pusty Enter = przerwanie; gotowa komenda z adresem i tokenem jest na dashboardzie, panel "Dodaj urzadzenie") ----
+if not "%SERVER_URL%"=="" goto :have_url
+echo Nie podano SERVER_URL.
+echo Najlatwiej: otworz dashboard DHM i skopiuj gotowa komende z panelu "Dodaj urzadzenie".
+set /p "SERVER_URL=Albo wpisz tutaj adres serwera DHM http://IP:4000 : "
+if "%SERVER_URL%"=="" (
+    echo ERROR: brak adresu serwera - instalacja przerwana.
+    pause
+    exit /b 1
+)
+:have_url
 if "%GITHUB_TAR%"=="" set "GITHUB_TAR=https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/dhm-agent.tar.gz"
 set "AGENT_DIR=C:\agent"
 set "AGENT_TAR=%TEMP%\dhm-agent.tar.gz"

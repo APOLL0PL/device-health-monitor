@@ -187,10 +187,11 @@ LAN_IP="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i==
 echo "Dashboard:   http://${LAN_IP:-<server-IP>}:$PORT_FINAL"
 echo "Logi:        pm2 logs $PM2_NAME"
 echo
-echo "Agenty (one-linery z README):"
-echo "  Linux:    curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && REGISTER_TOKEN=$REGISTER_TOKEN_FINAL sh /tmp/dhm.sh"
-echo "  Windows:  curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && %TEMP%\user-win.bat"
-echo "  Telefon:  pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && REGISTER_TOKEN=$REGISTER_TOKEN_FINAL sh /tmp/setup-dhm.sh"
+echo "Agenty (gotowe komendy sa tez na dashboardzie - panel 'Dodaj urzadzenie'):"
+DASH_URL="http://${LAN_IP:-<server-IP>}:$PORT_FINAL"
+echo "  Linux:    curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh && SERVER_URL=$DASH_URL REGISTER_TOKEN=$REGISTER_TOKEN_FINAL sh /tmp/dhm.sh"
+echo "  Windows:  curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-win.bat -o %TEMP%\user-win.bat && set SERVER_URL=$DASH_URL&& set REGISTER_TOKEN=$REGISTER_TOKEN_FINAL&& %TEMP%\user-win.bat"
+echo "  Telefon:  pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/setup-termux.sh -o /tmp/setup-dhm.sh && SERVER_URL=$DASH_URL REGISTER_TOKEN=$REGISTER_TOKEN_FINAL sh /tmp/setup-dhm.sh"
 echo
 echo "REGISTER_TOKEN: $REGISTER_TOKEN_FINAL"
 echo "             (trzymaj w sekrecie - agenty potrzebują go tylko przy rejestracji)"

@@ -170,6 +170,27 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, uptime: process.uptime(), version: PKG.version || null });
 });
 
+// Setup info dla dashboardu: gotowe komendy instalacji agenta
+// (adres z Host nagłówka - dashboard i tak jest otwarty w LAN)
+app.get('/api/setup', (req, res) => {
+  const host = req.headers.host || `localhost:${PORT}`;
+  const proto = req.protocol === 'https' ? 'https' : 'http';
+  const base = `${proto}://${host}`;
+  if (!REGISTER_TOKEN) {
+    return res.status(503).json({ error: 'REGISTER_TOKEN not configured — set it in server/.env' });
+  }
+  const rel = 'https://github.com/APOLL0PL/device-health-monitor/releases/latest/download';
+  res.json({
+    server_url: base,
+    register_token: REGISTER_TOKEN,
+    install: {
+      windows: `curl -fsSL ${rel}/user-win.bat -o %TEMP%\\user-win.bat && set SERVER_URL=${base}&& set REGISTER_TOKEN=${REGISTER_TOKEN}&& %TEMP%\\user-win.bat`,
+      linux: `curl -fsSL ${rel}/user-linux.sh -o /tmp/dhm-install.sh && SERVER_URL=${base} REGISTER_TOKEN=${REGISTER_TOKEN} sh /tmp/dhm-install.sh`,
+      termux: `pkg install -y curl && curl -fsSL ${rel}/setup-termux.sh -o /tmp/dhm-setup.sh && SERVER_URL=${base} REGISTER_TOKEN=${REGISTER_TOKEN} sh /tmp/dhm-setup.sh`,
+    },
+  });
+});
+
 // Write endpoints (require X-Auth-Token)
 app.patch('/api/devices/:id', limiterWrite, authWrite, (req, res) => {
   const id = Number(req.params.id);

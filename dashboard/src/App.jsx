@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Sun, Moon, MonitorDot, AlertTriangle, Percent, HardDrive } from 'lucide-react';
+import { Sun, Moon, MonitorDot, AlertTriangle, Percent, HardDrive, Plus } from 'lucide-react';
 import DeviceCard from './components/DeviceCard';
 import DeviceDetail from './components/DeviceDetail';
 import AlertsPanel from './components/AlertsPanel';
+import AddDevicePanel from './components/AddDevicePanel';
 
 const API = '';
 const TOKEN = window.DHM_CONFIG?.token;
@@ -31,6 +32,7 @@ export default function App() {
   const [alerts, setAlerts] = useState([]);
   const [dark, setDark] = useState(() => localStorage.getItem('theme') !== 'light');
   const [units, setUnits] = useState(() => localStorage.getItem('units') || 'pct');
+  const [showAdd, setShowAdd] = useState(false);
 
   const fetchData = useCallback(async () => {
     const [devData, alertData] = await Promise.all([
@@ -111,6 +113,13 @@ export default function App() {
             </span>
           )}
           <button
+            className="btn-add"
+            title="Dodaj urządzenie - gotowe komendy instalacji"
+            onClick={() => setShowAdd(true)}
+          >
+            <Plus size={16} /> Dodaj urządzenie
+          </button>
+          <button
             className="btn-theme"
             title="Przełącz jednostki: % / MB-GB"
             onClick={() => setUnits(units === 'pct' ? 'abs' : 'pct')}
@@ -125,11 +134,11 @@ export default function App() {
 
       <div className="layout">
         <main className="device-grid">
+          {showAdd && <AddDevicePanel onClose={() => setShowAdd(false)} />}
           {devices.length === 0 && (
             <div className="empty-state">
               <p>Brak urzadzen.</p>
-              <p>Zainstaluj agenta one-linerem z README (serwer poda Ci REGISTER_TOKEN):</p>
-              <code>curl -fsSL https://github.com/APOLL0PL/device-health-monitor/releases/latest/download/user-linux.sh -o /tmp/dhm.sh &amp;&amp; sh /tmp/dhm.sh</code>
+              <p>Kliknij „Dodaj urządzenie” w prawym górnym rogu - dostaniesz gotową komendę z adresem i tokenem.</p>
             </div>
           )}
           {devices.map((d) => (
