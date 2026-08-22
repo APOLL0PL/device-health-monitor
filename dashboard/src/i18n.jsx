@@ -3,6 +3,8 @@ import { createContext, useContext } from 'react';
 export const STRINGS = {
   pl: {
     back: 'Wstecz',
+    phName: 'nazwa urządzenia',
+    phGroup: 'grupa',
     addDevice: 'Dodaj urządzenie',
     online: 'online',
     offline: 'offline',
@@ -50,6 +52,8 @@ export const STRINGS = {
   },
   en: {
     back: 'Back',
+    phName: 'device name',
+    phGroup: 'group',
     addDevice: 'Add device',
     online: 'online',
     offline: 'offline',

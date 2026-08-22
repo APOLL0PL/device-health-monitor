@@ -103,6 +103,7 @@ export default function DeviceCard({ device, units, onClick }) {
             <div className="name-edit" onClick={e => e.stopPropagation()}>
               <input
                 autoFocus
+                placeholder={t('phName')}
                 value={nameVal}
                 onChange={e => setNameVal(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && saveName(e)}
@@ -110,7 +111,7 @@ export default function DeviceCard({ device, units, onClick }) {
               />
               <input
                 value={grpVal}
-                placeholder="grupa"
+                placeholder={t('phGroup')}
                 onChange={e => setGrpVal(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && saveName(e)}
                 className="name-input grp-input"
