@@ -15,6 +15,9 @@ const REGISTER_TOKEN = process.env.REGISTER_TOKEN || '';
 
 const KEY_FILE = path.join(__dirname, '.api_key');
 
+import { startAutoUpdate } from './updater.mjs';
+startAutoUpdate();
+
 function isVirtualIface(name) {
   return /^(br-|veth|docker|virbr|zbr|tun|vpn|tap|wg)/.test(name);
 }
