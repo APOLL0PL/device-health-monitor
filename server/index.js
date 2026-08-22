@@ -44,6 +44,11 @@ const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'ut
 app.disable('x-powered-by');
 app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
 app.use(express.json({ limit: '10kb' }));
+// config.js dynamicznie (AUTH_TOKEN z .env) - npm run build kasuje plik z dist,
+// a tak dashboard dostaje token niezaleznie od builda
+app.get('/config.js', (req, res) => {
+  res.type('application/javascript').send(`window.DHM_CONFIG = { token: ${JSON.stringify(AUTH_TOKEN)} };`);
+});
 app.use(express.static(path.join(__dirname, '../dashboard/dist')));
 
 const limiterRegister = rateLimit({ windowMs: 60_000, limit: 5 });
