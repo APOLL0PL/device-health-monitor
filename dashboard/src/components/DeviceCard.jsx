@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { Monitor, Terminal, Smartphone, Server, ThermometerSun, Pencil, Check, X, ArrowDown, ArrowUp, Battery, BatteryCharging } from 'lucide-react';
+import { useT } from '../i18n.jsx';
 
 const API = '';
 const TOKEN = window.DHM_CONFIG?.token;
 
-function timeAgo(dateStr) {
-  if (!dateStr) return 'nigdy';
+function timeAgo(dateStr, t) {
+  if (!dateStr) return t('never');
   const diff = Math.max(0, (Date.now() - new Date(dateStr + 'Z').getTime()) / 1000);
-  if (diff < 60) return `${Math.floor(diff)}s temu`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m temu`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h temu`;
-  return `${Math.floor(diff / 86400)}d temu`;
+  if (diff < 60) return `${Math.floor(diff)}${t('agoS')}`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}${t('agoM')}`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}${t('agoH')}`;
+  return `${Math.floor(diff / 86400)}${t('agoD')}`;
 }
 
 function fmtBytes(v) {
@@ -57,6 +58,7 @@ const osIcons = {
 };
 
 export default function DeviceCard({ device, units, onClick }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [nameVal, setNameVal] = useState(device.name);
   const [grpVal, setGrpVal] = useState(device.grp || '');
@@ -144,11 +146,11 @@ export default function DeviceCard({ device, units, onClick }) {
             crit={90}
           />
           {device.last_ram_cache > 0 && (
-            <div className="cache-info">Cache: {fmtMb(device.last_ram_cache)}</div>
+            <div className="cache-info">{t('cache')} {fmtMb(device.last_ram_cache)}</div>
           )}
           <div className="disk-boxes">
             <Gauge
-              label="Dysk — zajętość"
+              label={t('diskOccupancy')}
               value={diskUsed}
               max={diskTotal}
               display={abs
@@ -158,7 +160,7 @@ export default function DeviceCard({ device, units, onClick }) {
               crit={95}
             />
             <div className="disk-usage">
-              <div className="disk-usage-title">Dysk — użycie</div>
+              <div className="disk-usage-title">{t('diskUsage')}</div>
               <div className="disk-usage-value">
                 {diskUsed != null ? `${diskUsed} GB` : '—'}
               </div>
@@ -189,7 +191,7 @@ export default function DeviceCard({ device, units, onClick }) {
           )}
         </div>
       ) : (
-        <div className="offline-msg">Offline — ostatnio {timeAgo(device.last_seen)}</div>
+        <div className="offline-msg">{t('offlineSince')} {timeAgo(device.last_seen, t)}</div>
       )}
     </div>
   );

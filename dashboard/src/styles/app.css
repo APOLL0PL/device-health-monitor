@@ -114,6 +114,8 @@ header h1 { font-size: 1.2rem; font-weight: 600; }
 .threshold-save { background: var(--accent); border: none; color: #fff; border-radius: 6px; padding: 7px 16px; font-size: 0.8rem; cursor: pointer; }
 .threshold-save:hover { filter: brightness(1.15); }
 .thresholds-hint { margin-top: 8px; font-size: 0.7rem; color: var(--text2); opacity: 0.7; }
+
+.btn-lang { font-weight: 700; font-size: 0.75rem; letter-spacing: 0.05em; width: 44px; }
 .time-selector { display: flex; gap: 4px; margin-left: auto; }
 .time-selector button { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
 .time-selector button.active { background: var(--accent); color: white; border-color: var(--accent); }

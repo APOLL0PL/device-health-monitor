@@ -4,6 +4,7 @@ import DeviceCard from './components/DeviceCard';
 import DeviceDetail from './components/DeviceDetail';
 import AlertsPanel from './components/AlertsPanel';
 import AddDevicePanel from './components/AddDevicePanel';
+import { LangProvider, useT } from './i18n.jsx';
 
 const API = '';
 const TOKEN = window.DHM_CONFIG?.token;
@@ -39,6 +40,8 @@ export default function App() {
   const [units, setUnits] = useState(() => localStorage.getItem('units') || 'pct');
   const [showAdd, setShowAdd] = useState(false);
   const [groupFilter, setGroupFilter] = useState('');
+  const [lang, setLang] = useState(() => localStorage.getItem('lang') || 'pl');
+  const t = useT();
 
   const fetchData = useCallback(async () => {
     const [devData, alertData] = await Promise.all([
@@ -111,58 +114,72 @@ export default function App() {
     fetchData();
   };
 
+  useEffect(() => {
+    localStorage.setItem('lang', lang);
+    document.documentElement.setAttribute('lang', lang === 'en' ? 'en' : 'pl');
+  }, [lang]);
+
+  const toggleLang = () => setLang(l => (l === 'pl' ? 'en' : 'pl'));
+
   if (selected) {
     return (
-      <div className="app">
-        <header>
-          <button className="btn-back" onClick={closeDevice}>
-            <MonitorDot size={16} /> Wstecz
-          </button>
-          <h1>Device Health Monitor</h1>
-          <button className="btn-theme" onClick={() => setDark(!dark)}>
-            {dark ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-        </header>
-        <DeviceDetail deviceId={selected} api={api} />
-      </div>
+      <LangProvider lang={lang}>
+        <div className="app">
+          <header>
+            <button className="btn-back" onClick={closeDevice}>
+              <MonitorDot size={16} /> {t("back")}
+            </button>
+            <h1>Device Health Monitor</h1>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-theme btn-lang" onClick={toggleLang}>{lang === 'pl' ? 'EN' : 'PL'}</button>
+              <button className="btn-theme" onClick={() => setDark(!dark)}>
+                {dark ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+            </div>
+          </header>
+          <DeviceDetail deviceId={selected} api={api} />
+        </div>
+      </LangProvider>
     );
   }
 
   return (
-    <div className="app">
-      <header>
-        <h1><MonitorDot size={22} strokeWidth={1.5} /> Device Health Monitor</h1>
-        <div className="header-right">
-          <span className="summary-badge online">{summary.online}/{summary.total} online</span>
-          {summary.offline > 0 && (
-            <span className="summary-badge offline">
-              <MonitorDot size={13} /> {summary.offline} offline
-            </span>
-          )}
-          {summary.activeAlerts > 0 && (
-            <span className="summary-badge alert">
-              <AlertTriangle size={13} /> {summary.activeAlerts} alert{summary.activeAlerts > 1 ? 'y' : ''}
-            </span>
-          )}
-          <button
-            className="btn-add"
-            title="Dodaj urządzenie - gotowe komendy instalacji"
-            onClick={() => setShowAdd(true)}
-          >
-            <Plus size={16} /> Dodaj urządzenie
-          </button>
-          <button
-            className="btn-theme"
-            title="Przełącz jednostki: % / MB-GB"
-            onClick={() => setUnits(units === 'pct' ? 'abs' : 'pct')}
-          >
-            {units === 'pct' ? <Percent size={16} /> : <HardDrive size={16} />}
-          </button>
-          <button className="btn-theme" onClick={() => setDark(!dark)}>
-            {dark ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-        </div>
-      </header>
+    <LangProvider lang={lang}>
+      <div className="app">
+        <header>
+          <h1><MonitorDot size={22} strokeWidth={1.5} /> Device Health Monitor</h1>
+          <div className="header-right">
+            <span className="summary-badge online">{summary.online}/{summary.total} {t("online")}</span>
+            {summary.offline > 0 && (
+              <span className="summary-badge offline">
+                <MonitorDot size={13} /> {summary.offline} {t("offline")}
+              </span>
+            )}
+            {summary.activeAlerts > 0 && (
+              <span className="summary-badge alert">
+                <AlertTriangle size={13} /> {summary.activeAlerts}
+              </span>
+            )}
+            <button
+              className="btn-add"
+              title={t('addDevice')}
+              onClick={() => setShowAdd(true)}
+            >
+              <Plus size={16} /> {t("addDevice")}
+            </button>
+            <button
+              className="btn-theme"
+              title="% / MB-GB"
+              onClick={() => setUnits(units === 'pct' ? 'abs' : 'pct')}
+            >
+              {units === 'pct' ? <Percent size={16} /> : <HardDrive size={16} />}
+            </button>
+            <button className="btn-theme btn-lang" onClick={toggleLang}>{lang === 'pl' ? 'EN' : 'PL'}</button>
+            <button className="btn-theme" onClick={() => setDark(!dark)}>
+              {dark ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
+        </header>
 
       {(() => {
         const groups = [...new Set(devices.map(d => d.grp).filter(Boolean))];
@@ -170,7 +187,7 @@ export default function App() {
         return (
           <div className="group-filter">
             <button className={`group-chip-btn ${groupFilter === '' ? 'active' : ''}`} onClick={() => setGroupFilter('')}>
-              Wszystkie ({devices.length})
+              {t('all')} ({devices.length})
             </button>
             {groups.map(g => (
               <button key={g} className={`group-chip-btn ${groupFilter === g ? 'active' : ''}`} onClick={() => setGroupFilter(groupFilter === g ? '' : g)}>
@@ -186,8 +203,8 @@ export default function App() {
           {showAdd && <AddDevicePanel onClose={() => setShowAdd(false)} />}
           {devices.length === 0 && (
             <div className="empty-state">
-              <p>Brak urzadzen.</p>
-              <p>Kliknij „Dodaj urządzenie” w prawym górnym rogu - dostaniesz gotową komendę z adresem i tokenem.</p>
+              <p>{t('noDevices')}</p>
+              <p>{t('emptyHint')}</p>
             </div>
           )}
           {devices
@@ -202,5 +219,6 @@ export default function App() {
         )}
       </div>
     </div>
+    </LangProvider>
   );
 }

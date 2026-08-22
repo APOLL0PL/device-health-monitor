@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Clock, SlidersHorizontal } from 'lucide-react';
+import { useT, useLang, localeOf } from '../i18n.jsx';
 
 const DISK_COLORS = ['#a855f7', '#22c55e', '#3b82f6', '#f97316', '#eab308', '#ef4444', '#14b8a6', '#8b5cf6'];
 
 const THRESHOLD_FIELDS = [
-  ['disk_percent', 'Dysk %'],
-  ['temperature_c', 'Temp °C'],
-  ['cpu_percent', 'CPU %'],
-  ['cpu_duration_minutes', 'CPU min'],
+  ['disk_percent', t('thrDisk')],
+  ['temperature_c', t('thrTemp')],
+  ['cpu_percent', t('thrCpu')],
+  ['cpu_duration_minutes', t('thrCpuMin')],
 ];
 
 function ThresholdsPanel({ deviceId }) {
+  const t = useT();
   const [values, setValues] = useState(null);
   const [saved, setSaved] = useState(false);
 
@@ -42,7 +44,7 @@ function ThresholdsPanel({ deviceId }) {
   if (!values) return null;
   return (
     <div className="thresholds-panel">
-      <h3><SlidersHorizontal size={12} /> Progi alertów</h3>
+      <h3><SlidersHorizontal size={12} /> {t('thresholds')}</h3>
       <div className="thresholds-row">
         {THRESHOLD_FIELDS.map(([key, label]) => (
           <label key={key} className="threshold-field">
@@ -55,14 +57,16 @@ function ThresholdsPanel({ deviceId }) {
             />
           </label>
         ))}
-        <button className="threshold-save" onClick={save}>{saved ? 'Zapisano ✓' : 'Zapisz'}</button>
+        <button className="threshold-save" onClick={save}>{saved ? t('saved') : t('save')}</button>
       </div>
-      <p className="thresholds-hint">Puste pole = wartość domyślna (dysk 90%, temp 70°C, CPU 90%/5 min)</p>
+      <p className="thresholds-hint">{t('thrHint')}</p>
     </div>
   );
 }
 
 export default function DeviceDetail({ deviceId, api }) {
+  const t = useT();
+  const locale = localeOf(useLang());
   const [device, setDevice] = useState(null);
   const [metrics, setMetrics] = useState([]);
   const [diskSeries, setDiskSeries] = useState({});
@@ -88,7 +92,7 @@ export default function DeviceDetail({ deviceId, api }) {
         }
         return {
           ...m,
-          time: new Date(m.timestamp + 'Z').toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }),
+          time: new Date(m.timestamp + 'Z').toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
           ram_pct: m.ram_total_mb > 0 ? Math.round((m.ram_used_mb / m.ram_total_mb) * 100) : 0,
           disk_pct: m.disk_total_gb > 0 ? Math.round((m.disk_used_gb / m.disk_total_gb) * 100) : 0,
           net_in_rate,
@@ -113,7 +117,7 @@ export default function DeviceDetail({ deviceId, api }) {
     });
   }, [deviceId, hours]);
 
-  if (!device) return <div className="loading">Ladowanie...</div>;
+  if (!device) return <div className="loading">{t('loading')}</div>;
 
   return (
     <div className="device-detail">
@@ -133,7 +137,7 @@ export default function DeviceDetail({ deviceId, api }) {
 
       {device.last_disks?.length > 0 && (
         <div className="disks-panel">
-          <h3>Dyski ({device.last_disks.length})</h3>
+          <h3>{t('disks')} ({device.last_disks.length})</h3>
           {device.last_disks.map((d) => {
             const pct = d.total_gb > 0 ? (d.used_gb / d.total_gb) * 100 : 0;
             const color = pct > 95 ? 'var(--crit)' : pct > 80 ? 'var(--warn)' : 'var(--ok)';
@@ -157,11 +161,11 @@ export default function DeviceDetail({ deviceId, api }) {
         <div className="charts-grid">
           <ChartCard title="CPU %" data={metrics} dataKey="cpu_percent" color="#f97316" max={100} unit="%" />
           <ChartCard title="RAM %" data={metrics} dataKey="ram_pct" color="#3b82f6" max={100} unit="%" />
-          <ChartCard title="Dysk %" data={metrics} dataKey="disk_pct" color="#a855f7" max={100} unit="%" />
-          <ChartCard title="Temperatura" data={metrics} dataKey="temperature_c" color="#ef4444" unit="°C" />
+          <ChartCard title={t('chartDiskPct')} data={metrics} dataKey="disk_pct" color="#a855f7" max={100} unit="%" />
+          <ChartCard title={t('chartTemperature')} data={metrics} dataKey="temperature_c" color="#ef4444" unit="°C" />
           <ChartCard title="RAM" data={metrics} dataKey="ram_used_mb" color="#3b82f6" unitMb />
-          <ChartCard title="Internet ↓" data={metrics} dataKey="net_in_rate" color="#22c55e" rateBytes />
-          <ChartCard title="Internet ↑" data={metrics} dataKey="net_out_rate" color="#eab308" rateBytes />
+          <ChartCard title={t('chartInternetDown')} data={metrics} dataKey="net_in_rate" color="#22c55e" rateBytes />
+          <ChartCard title={t('chartInternetUp')} data={metrics} dataKey="net_out_rate" color="#eab308" rateBytes />
         </div>
       )}
 
@@ -170,7 +174,7 @@ export default function DeviceDetail({ deviceId, api }) {
           {Object.entries(diskSeries).map(([mount, series], i) => (
             <ChartCard
               key={mount}
-              title={`Dysk ${mount} %`}
+              title={t('chartDiskMount', { mount })}
               data={series}
               dataKey="pct"
               id={`disk-${i}`}
