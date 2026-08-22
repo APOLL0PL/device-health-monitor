@@ -47,7 +47,7 @@ if %errorlevel% neq 0 (
     echo Brak Node.js. Instaluje Node.js LTS...
     winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent
     echo.
-    echo Zamknij to okno i uruchom skrypt ponownie (PATH zostal zaktualizowany).
+    echo Zamknij to okno i uruchom skrypt ponownie - PATH zostal zaktualizowany.
     pause
     exit /b 1
 )
