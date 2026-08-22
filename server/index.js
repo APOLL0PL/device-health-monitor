@@ -22,7 +22,7 @@ import {
   registerDevice,
   removeDevice,
   resolveAlert,
-  updateDeviceName,
+  updateDeviceMeta,
 } from './lib/store.js';
 import { start as selfmonitorStart } from './lib/selfmonitor.js';
 
@@ -65,10 +65,12 @@ const registerSchema = z.object({
   type: z.enum(['server', 'desktop', 'laptop', 'phone', 'android', 'unknown']).default('unknown'),
   os_name: z.string().max(32).default('unknown'),
   mac: z.string().max(32).optional().nullable(),
+  group: z.string().trim().max(32).optional(),
   register_token: z.string().optional(),
 });
 
 const nameSchema = z.string().trim().min(1).max(64);
+const groupSchema = z.string().trim().max(32);
 
 function authWrite(req, res, next) {
   if (!AUTH_TOKEN) {
@@ -103,7 +105,8 @@ app.post('/api/agent/register', limiterRegister, (req, res) => {
     body.ip,
     body.type,
     body.os_name,
-    body.mac || null
+    body.mac || null,
+    body.group || ''
   );
   if (!device) {
     return res.status(409).json({ error: 'No reliable identity (IP loopback without MAC)' });
@@ -205,8 +208,12 @@ app.get('/api/setup', (req, res) => {
 app.patch('/api/devices/:id', limiterWrite, authWrite, (req, res) => {
   const id = Number(req.params.id);
   if (!getDevice(id)) return res.status(404).json({ error: 'Not found' });
-  const name = nameSchema.parse(req.body?.name);
-  updateDeviceName(id, name);
+  const patch = {};
+  if (req.body?.name !== undefined) patch.name = nameSchema.parse(req.body.name);
+  if (req.body?.grp !== undefined) patch.grp = groupSchema.parse(req.body.grp);
+  if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'Nothing to update' });
+  updateDeviceMeta(id, patch);
+  broadcast({ type: 'device_update', device: publicDevice(getDevice(id)) });
   res.json({ ok: true, device: publicDevice(getDevice(id)) });
 });
 

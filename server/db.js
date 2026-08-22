@@ -62,6 +62,7 @@ try { db.exec("ALTER TABLE metrics ADD COLUMN disk_sys_total_gb REAL DEFAULT 0")
 try { db.exec("ALTER TABLE metrics ADD COLUMN disks_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE metrics ADD COLUMN battery_percent REAL"); } catch {}
 try { db.exec("ALTER TABLE metrics ADD COLUMN battery_charging INTEGER"); } catch {}
+try { db.exec("ALTER TABLE devices ADD COLUMN grp TEXT DEFAULT ''"); } catch {}
 db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_mac ON devices(mac) WHERE mac IS NOT NULL");
 try { db.exec("ALTER TABLE alerts ADD COLUMN type TEXT NOT NULL DEFAULT 'threshold'"); } catch {}
 db.exec("DELETE FROM alerts WHERE type = 'device_offline'");

@@ -11,6 +11,7 @@ const DEVICE_TYPE = process.env.DEVICE_TYPE || 'server';
 const DEFAULT_INTERVAL_SECONDS = (DEVICE_TYPE === 'phone' || DEVICE_TYPE === 'android') ? 300 : 60;
 const INTERVAL = (Number(process.env.REPORT_INTERVAL) || DEFAULT_INTERVAL_SECONDS) * 1000;
 const DEVICE_NAME = process.env.DEVICE_NAME || os.hostname();
+const DEVICE_GROUP = process.env.DEVICE_GROUP || '';
 const REGISTER_TOKEN = process.env.REGISTER_TOKEN || '';
 
 const KEY_FILE = path.join(__dirname, '.api_key');
@@ -157,6 +158,7 @@ async function register(apiKey) {
       type: DEVICE_TYPE,
       os_name: os.platform(),
       mac,
+      group: DEVICE_GROUP,
       register_token: REGISTER_TOKEN,
     }),
   });

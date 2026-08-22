@@ -59,6 +59,7 @@ const osIcons = {
 export default function DeviceCard({ device, units, onClick }) {
   const [editing, setEditing] = useState(false);
   const [nameVal, setNameVal] = useState(device.name);
+  const [grpVal, setGrpVal] = useState(device.grp || '');
   const Icon = osIcons[device.os_name] || Server;
   const tempColor = device.last_temp != null
     ? (device.last_temp > 80 ? 'var(--crit)' : device.last_temp > 70 ? 'var(--warn)' : 'var(--text2)')
@@ -73,14 +74,17 @@ export default function DeviceCard({ device, units, onClick }) {
 
   const saveName = async (e) => {
     e.stopPropagation();
-    if (nameVal.trim() && nameVal !== device.name) {
+    const patch = {};
+    if (nameVal.trim() && nameVal !== device.name) patch.name = nameVal.trim();
+    if (grpVal.trim() !== (device.grp || '')) patch.grp = grpVal.trim();
+    if (Object.keys(patch).length) {
       await fetch(`${API}/api/devices/${device.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           ...(TOKEN ? { 'X-Auth-Token': TOKEN } : {}),
         },
-        body: JSON.stringify({ name: nameVal.trim() }),
+        body: JSON.stringify(patch),
       });
     }
     setEditing(false);
@@ -102,12 +106,20 @@ export default function DeviceCard({ device, units, onClick }) {
                 onKeyDown={e => e.key === 'Enter' && saveName(e)}
                 className="name-input"
               />
+              <input
+                value={grpVal}
+                placeholder="grupa"
+                onChange={e => setGrpVal(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveName(e)}
+                className="name-input grp-input"
+              />
               <button className="btn-icon save" onClick={saveName}><Check size={14} /></button>
-              <button className="btn-icon cancel" onClick={() => { setNameVal(device.name); setEditing(false); }}><X size={14} /></button>
+              <button className="btn-icon cancel" onClick={() => { setNameVal(device.name); setGrpVal(device.grp || ''); setEditing(false); }}><X size={14} /></button>
             </div>
           ) : (
             <div className="device-name-row">
               <span className="device-name">{device.name}</span>
+              {device.grp && <span className="group-chip">{device.grp}</span>}
               <button className="btn-icon edit" onClick={e => { e.stopPropagation(); setEditing(true); }}><Pencil size={12} /></button>
             </div>
           )}

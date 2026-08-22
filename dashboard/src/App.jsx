@@ -38,6 +38,7 @@ export default function App() {
   const [dark, setDark] = useState(() => localStorage.getItem('theme') !== 'light');
   const [units, setUnits] = useState(() => localStorage.getItem('units') || 'pct');
   const [showAdd, setShowAdd] = useState(false);
+  const [groupFilter, setGroupFilter] = useState('');
 
   const fetchData = useCallback(async () => {
     const [devData, alertData] = await Promise.all([
@@ -163,6 +164,23 @@ export default function App() {
         </div>
       </header>
 
+      {(() => {
+        const groups = [...new Set(devices.map(d => d.grp).filter(Boolean))];
+        if (groups.length === 0) return null;
+        return (
+          <div className="group-filter">
+            <button className={`group-chip-btn ${groupFilter === '' ? 'active' : ''}`} onClick={() => setGroupFilter('')}>
+              Wszystkie ({devices.length})
+            </button>
+            {groups.map(g => (
+              <button key={g} className={`group-chip-btn ${groupFilter === g ? 'active' : ''}`} onClick={() => setGroupFilter(groupFilter === g ? '' : g)}>
+                {g} ({devices.filter(d => d.grp === g).length})
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+
       <div className="layout">
         <main className="device-grid">
           {showAdd && <AddDevicePanel onClose={() => setShowAdd(false)} />}
@@ -172,7 +190,9 @@ export default function App() {
               <p>Kliknij „Dodaj urządzenie” w prawym górnym rogu - dostaniesz gotową komendę z adresem i tokenem.</p>
             </div>
           )}
-          {devices.map((d) => (
+          {devices
+            .filter(d => !groupFilter || d.grp === groupFilter)
+            .map((d) => (
             <DeviceCard key={d.id} device={d} units={units} onClick={() => openDevice(d.id)} />
           ))}
         </main>

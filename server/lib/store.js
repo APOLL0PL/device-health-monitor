@@ -27,7 +27,7 @@ function isLoopback(ip) {
   return typeof ip === 'string' && (ip === '127.0.0.1' || ip.startsWith('127.'));
 }
 
-function registerDevice(name, ip, type = 'unknown', os_name = 'unknown', mac = null) {
+function registerDevice(name, ip, type = 'unknown', os_name = 'unknown', mac = null, grp = '') {
   // Try MAC-based lookup first
   if (mac) {
     const existing = db.prepare('SELECT id, api_key, ip FROM devices WHERE mac = ?').get(mac);
@@ -55,8 +55,8 @@ function registerDevice(name, ip, type = 'unknown', os_name = 'unknown', mac = n
 
   const api_key = crypto.randomUUID();
   const result = db.prepare(
-    'INSERT INTO devices (name, ip, type, os_name, mac, api_key) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(name, ip, type, os_name, mac, api_key);
+    'INSERT INTO devices (name, ip, type, os_name, mac, api_key, grp) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(name, ip, type, os_name, mac, api_key, grp);
 
   return { id: result.lastInsertRowid, api_key };
 }
@@ -79,8 +79,9 @@ function getDeviceByKey(api_key) {
   return db.prepare('SELECT * FROM devices WHERE api_key = ?').get(api_key);
 }
 
-function updateDeviceName(id, name) {
-  db.prepare('UPDATE devices SET name = ? WHERE id = ?').run(name, id);
+function updateDeviceMeta(id, { name, grp } = {}) {
+  if (name !== undefined) db.prepare('UPDATE devices SET name = ? WHERE id = ?').run(name, id);
+  if (grp !== undefined) db.prepare('UPDATE devices SET grp = ? WHERE id = ?').run(grp, id);
 }
 
 function removeDevice(id) {
@@ -274,7 +275,7 @@ export {
   publicDevice,
   getDevice,
   getDeviceByKey,
-  updateDeviceName,
+  updateDeviceMeta,
   removeDevice,
   recordMetrics,
   getMetrics,
