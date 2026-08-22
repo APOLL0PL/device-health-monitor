@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Clock } from 'lucide-react';
 
+const DISK_COLORS = ['#a855f7', '#22c55e', '#3b82f6', '#f97316', '#eab308', '#ef4444', '#14b8a6', '#8b5cf6'];
+
 export default function DeviceDetail({ deviceId, api }) {
   const [device, setDevice] = useState(null);
   const [metrics, setMetrics] = useState([]);
+  const [diskSeries, setDiskSeries] = useState({});
   const [hours, setHours] = useState(24);
 
   useEffect(() => {
@@ -34,7 +37,21 @@ export default function DeviceDetail({ deviceId, api }) {
           net_out_rate,
         };
       });
+
+      const diskSeries = {};
+      for (const m of data) {
+        let arr = [];
+        try { arr = m.disks_json ? JSON.parse(m.disks_json) : []; } catch {}
+        for (const d of arr) {
+          (diskSeries[d.mount] ||= []).push({
+            time: m.time,
+            pct: d.total_gb > 0 ? Math.round((d.used_gb / d.total_gb) * 1000) / 10 : 0,
+          });
+        }
+      }
+
       setMetrics(data);
+      setDiskSeries(diskSeries);
     });
   }, [deviceId, hours]);
 
@@ -87,11 +104,28 @@ export default function DeviceDetail({ deviceId, api }) {
           <ChartCard title="Internet ↑" data={metrics} dataKey="net_out_rate" color="#eab308" rateBytes />
         </div>
       )}
+
+      {Object.keys(diskSeries).length > 0 && (
+        <div className="charts-grid">
+          {Object.entries(diskSeries).map(([mount, series], i) => (
+            <ChartCard
+              key={mount}
+              title={`Dysk ${mount} %`}
+              data={series}
+              dataKey="pct"
+              id={`disk-${i}`}
+              color={DISK_COLORS[i % DISK_COLORS.length]}
+              max={100}
+              unit="%"
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function ChartCard({ title, data, dataKey, color, max, unit, formatBytes, rateBytes, unitMb }) {
+function ChartCard({ title, data, dataKey, color, max, unit, formatBytes, rateBytes, unitMb, id }) {
   const formatValue = (v) => {
     if (v == null) return '—';
     if (rateBytes) {
@@ -118,7 +152,7 @@ function ChartCard({ title, data, dataKey, color, max, unit, formatBytes, rateBy
       <ResponsiveContainer width="100%" height={180}>
         <AreaChart data={data}>
           <defs>
-            <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={`grad-${id || dataKey}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity={0.3} />
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
@@ -126,7 +160,7 @@ function ChartCard({ title, data, dataKey, color, max, unit, formatBytes, rateBy
           <XAxis dataKey="time" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
           <YAxis domain={max ? [0, max] : undefined} tick={{ fontSize: 10 }} width={40} />
           <Tooltip formatter={(v) => formatValue(v)} labelStyle={{ color: '#888' }} />
-          <Area type="monotone" dataKey={dataKey} stroke={color} fill={`url(#grad-${dataKey})`} dot={false} />
+          <Area type="monotone" dataKey={dataKey} stroke={color} fill={`url(#grad-${id || dataKey})`} dot={false} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
