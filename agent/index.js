@@ -2,6 +2,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import si from 'systeminformation';
 
@@ -107,12 +108,39 @@ async function getNetworkTotals() {
 async function getTemperature() {
   const temp = await si.cpuTemperature().catch(() => ({ main: null }));
   if (Number.isFinite(temp.main) && temp.main > 0) return temp.main;
+  const nv = await nvidiaSmiTemp();
+  if (nv !== null) return nv;
   const gfx = await si.graphics().catch(() => ({ controllers: [] }));
   const temps = (gfx.controllers || [])
     .map((c) => c.temperatureCore)
     .filter((t) => Number.isFinite(t) && t > 0);
   if (temps.length) return Math.max(...temps);
   return null;
+}
+
+// GPU temp z nvidia-smi - dziala bez admina, ratuje maszyny gdzie ACPI
+// nie wystawia temperatury CPU (czeste na Windows; pm2/SSH czesto tez nie
+// ma dostepu do MSAcpi_ThermalZoneTemperature).
+function nvidiaSmiTemp() {
+  return new Promise((resolve) => {
+    const exe = process.platform === 'win32'
+      ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'nvidia-smi.exe')
+      : 'nvidia-smi';
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
+    try {
+      const c = spawn(exe, ['--query-gpu=temperature.gpu', '--format=csv,noheader,nounits'], { timeout: 5000 });
+      let out = '';
+      c.stdout?.on('data', (d) => (out += d));
+      c.on('error', () => finish(null));
+      c.on('close', () => {
+        const v = Number(String(out).trim().split(/\r?\n/)[0]);
+        finish(Number.isFinite(v) && v > 0 && v < 120 ? v : null);
+      });
+    } catch {
+      finish(null);
+    }
+  });
 }
 
 async function getBattery() {
