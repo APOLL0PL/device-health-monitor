@@ -119,12 +119,18 @@ Główny dashboard z urządzeniami, alertami i panelem offline:
 - **Tylko LAN** — agenty i dashboard komunikują się z serwerem wyłącznie w sieci lokalnej,
   na wybranym porcie (domyślnie `4000`). Bez chmury, bez wychodzenia do internetu.
   Nie wystawiaj tego portu na internet bez znajomości konsekwencji.
-- **Odczyt otwarty, bez logowania** — każdy w sieci LAN widzi dashboard i `GET /api/*` + WebSocket.
-- **Zapis chroniony** — usuwanie urządzeń, zmiana nazw, rozwiązywanie alertów wymaga `X-Auth-Token` (= `AUTH_TOKEN` z `server/.env`).
+- **Login na dashboard** — ustaw `DASHBOARD_PASSWORD` w `server/.env` (skrypt instalacyjny generuje je sam).
+  Z ustawionym hasłem cały dashboard (odczyt, zapis, WebSocket, `/metrics`, `/api/setup`) wymaga zalogowania;
+  sesja siedzi w cookie HttpOnly, a `AUTH_TOKEN` nigdy nie trafia do przeglądarki.
+- **Tryb otwarty (legacy)** — bez `DASHBOARD_PASSWORD` każdy w LAN widzi dashboard; zapis wymaga
+  `X-Auth-Token` (= `AUTH_TOKEN`). Serwer ostrzega o tym w logach przy starcie. Tylko dla domowego LAN.
 - **Rejestracja agentów** wymaga `register_token` (= `REGISTER_TOKEN` z `server/.env`) — blokuje fałszywe urządzenia i kradzież kluczy po MAC.
 - **Raporty** wymagają `X-Api-Key` wydanego przy rejestracji.
-- Tokeny **generują się automatycznie** w `serwer.sh` (`server/.env` + `dashboard/dist/config.js`, oba w `.gitignore`). Frontend używa ich sam — zero logowania.
-- CORS ograniczony, rate limiting, walidacja wejścia, brak `?token=` w URL.
+- **Tożsamość urządzeń** — agent generuje trwały `device_uuid`; zmiany IP/MAC nie tworzą duplikatów ani nie sklejają różnych urządzeń.
+- **Integralność aktualizacji** — tarball-e release publikowane są z sumami `.sha256`, które auto-updater weryfikuje przed instalacją.
+- Tokeny **generują się automatycznie** w `serwer.sh` (`server/.env`, w `.gitignore`).
+- CORS domyślnie wyłączony (w dev włączaj świadomie: `CORS_DEV=1`), rate limiting, walidacja wejścia, brak `?token=` w URL.
+- Ruch idzie czystym **HTTP** — w LAN OK, ale nie rób port-forwardingu; zdalny dostęp tylko za reverse proxy z TLS (Caddy/nginx).
 
 ## Wymagania
 
@@ -159,7 +165,8 @@ Skrypty przyjmują zmienne (`SERVER_URL`, `DEVICE_NAME`, `DEVICE_TYPE`, `REPORT_
 |---------|-------|------|----------|
 | `PORT` | server | Port HTTP | `4000` |
 | `AUTH_TOKEN` | server | Token zapisów (generowany przy setupie) | auto |
-| `REGISTER_TOKEN` | server | Token rejestracji agentów (generowany) | auto |
+| REGISTER_TOKEN | server | Token rejestracji agentów (generowany) | auto |
+| `DASHBOARD_PASSWORD` | server | Hasło logowania do dashboardu (generowane; puste = otwarty dashboard) | auto |
 | `SELF_REPORT_INTERVAL` | server | Interwał self-monitora (ms) | `60000` |
 | `SERVER_URL` | agent | Adres serwera DHM | `http://localhost:4000` |
 | `DEVICE_NAME` | agent | Nazwa na dashboardzie | hostname |
@@ -169,11 +176,12 @@ Skrypty przyjmują zmienne (`SERVER_URL`, `DEVICE_NAME`, `DEVICE_TYPE`, `REPORT_
 
 ## API
 
-Serwer: Node.js + Express + SQLite. Odczyt jest **otwarty**; zapis wymaga nagłówka `X-Auth-Token`
+Serwer: Node.js + Express + SQLite. Odczyt wymaga sesji, gdy ustawione jest `DASHBOARD_PASSWORD`
+(legacy: otwarty); zapis wymaga nagłówka `X-Auth-Token`
 (= `AUTH_TOKEN` z `server/.env`); agent raportuje z kluczem `X-Api-Key` wydanym przy rejestracji.
 Błędy: `{ "error": "..." }`. Rate limiting: register 5/min/IP, report 30/min/klucz, zapisy 30/min/IP.
 
-### Odczyt (bez tokenu)
+### Odczyt (wymaga sesji, gdy ustawione `DASHBOARD_PASSWORD`)
 - `GET /api/devices` — lista urządzeń + `summary: { total, online, offline, activeAlerts }`
 - `GET /api/devices/:id` — urządzenie + ostatnie metryki
 - `GET /api/devices/:id/metrics?hours=24` — historia metryk (hours 1–720)

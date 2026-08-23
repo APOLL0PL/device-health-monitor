@@ -122,12 +122,19 @@ Main dashboard with devices, alerts and offline panel:
 - **LAN-only** — agents and the dashboard talk to the server only over your local network,
   on the chosen port (default `4000`). No cloud, no internet egress. Do not expose this port
   to the internet unless you know what you are doing.
-- **Open reads, no login** — anyone on the LAN can view the dashboard and `GET /api/*` + WebSocket.
-- **Writes protected** — deleting devices, renaming, resolving alerts requires `X-Auth-Token` (= `AUTH_TOKEN` from `server/.env`).
+- **Dashboard login** — set `DASHBOARD_PASSWORD` in `server/.env` (the server script generates it).
+  With a password set, the whole dashboard (reads, writes, WebSocket, `/metrics`, `/api/setup`)
+  requires signing in; the session lives in an HttpOnly cookie. The `AUTH_TOKEN` is never sent
+  to the browser in this mode.
+- **Legacy open mode** — without `DASHBOARD_PASSWORD` anyone on the LAN can view the dashboard;
+  writes require `X-Auth-Token` (= `AUTH_TOKEN`). The server logs a warning at startup.
 - **Agent registration** requires `register_token` (= `REGISTER_TOKEN` from `server/.env`) — blocks fake devices and MAC key theft.
 - **Reports** require the `X-Api-Key` issued at registration.
-- Tokens are **generated automatically** by `serwer.sh` (`server/.env` + `dashboard/dist/config.js`, both in `.gitignore`). The frontend uses them automatically — no login.
-- CORS restricted, rate limiting, input validation, no `?token=` in URLs.
+- **Device identity** — agents generate a persistent `device_uuid`; IP/MAC changes no longer create duplicates or merge different devices.
+- **Update integrity** — release tarballs are published with `.sha256` checksums and verified by the agent auto-updater before install.
+- Tokens are **generated automatically** by `serwer.sh` (`server/.env`, gitignored).
+- CORS is off by default (enable only for dev with `CORS_DEV=1`), rate limiting, input validation, no `?token=` in URLs.
+- Traffic is plain **HTTP** — fine inside your LAN, but do not port-forward it; put a TLS reverse proxy (Caddy/nginx) in front if you need remote access.
 
 ## Requirements
 
@@ -163,6 +170,7 @@ The scripts accept variables (`SERVER_URL`, `DEVICE_NAME`, `DEVICE_TYPE`, `REPOR
 | `PORT` | server | HTTP port | `4000` |
 | `AUTH_TOKEN` | server | Write token (generated at setup) | auto |
 | `REGISTER_TOKEN` | server | Agent registration token (generated) | auto |
+| `DASHBOARD_PASSWORD` | server | Dashboard login password (generated; empty = open dashboard) | auto |
 | `SELF_REPORT_INTERVAL` | server | Self-monitor interval (ms) | `60000` |
 | `SERVER_URL` | agent | DHM server address | `http://localhost:4000` |
 | `DEVICE_NAME` | agent | Name on the dashboard | hostname |
@@ -176,7 +184,7 @@ Server: Node.js + Express + SQLite. Reads are **open**; writes require the `X-Au
 (= `AUTH_TOKEN` from `server/.env`); the agent reports with the `X-Api-Key` issued at registration.
 Errors: `{ "error": "..." }`. Rate limiting: register 5/min/IP, report 30/min/key, writes 30/min/IP.
 
-### Read (no token)
+### Read (session required when `DASHBOARD_PASSWORD` is set)
 - `GET /api/devices` — device list + `summary: { total, online, offline, activeAlerts }`
 - `GET /api/devices/:id` — device + latest metrics
 - `GET /api/devices/:id/metrics?hours=24` — metric history (hours 1–720)
