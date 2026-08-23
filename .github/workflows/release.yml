@@ -50,7 +50,9 @@ jobs:
           body_path: /tmp/release-notes.md
           files: |
             release/dhm-agent.tar.gz
+            release/dhm-agent.tar.gz.sha256
             release/dhm-bundle.tar.gz
+            release/dhm-bundle.tar.gz.sha256
             scripts/serwer.sh
             scripts/user-linux.sh
             scripts/user-win.bat

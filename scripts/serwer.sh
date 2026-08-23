@@ -140,24 +140,33 @@ gen_token() {
 }
 if [ -f "$INSTALL_DIR/server/.env" ] && grep -q '^AUTH_TOKEN=' "$INSTALL_DIR/server/.env"; then
     warn "server/.env istnieje - zostawiam obecne tokeny"
+    if ! grep -q '^DASHBOARD_PASSWORD=' "$INSTALL_DIR/server/.env"; then
+        DASHBOARD_PASSWORD="${DASHBOARD_PASSWORD:-$(gen_token)}"
+        echo "DASHBOARD_PASSWORD=$DASHBOARD_PASSWORD" >> "$INSTALL_DIR/server/.env"
+        ok "Dodano DASHBOARD_PASSWORD do server/.env"
+    fi
 else
     AUTH_TOKEN="${AUTH_TOKEN:-$(gen_token)}"
     REGISTER_TOKEN="${REGISTER_TOKEN:-$(gen_token)}"
+    DASHBOARD_PASSWORD="${DASHBOARD_PASSWORD:-$(gen_token)}"
     cat > "$INSTALL_DIR/server/.env" <<EOF
 PORT=$PORT
 AUTH_TOKEN=$AUTH_TOKEN
 REGISTER_TOKEN=$REGISTER_TOKEN
+DASHBOARD_PASSWORD=$DASHBOARD_PASSWORD
 EOF
-    ok "Wygenerowano server/.env (tokeny zapisu + rejestracji)"
+    ok "Wygenerowano server/.env (tokeny zapisu + rejestracji + hasło dashboardu)"
 fi
 mkdir -p "$INSTALL_DIR/dashboard/dist"
-AUTH_TOKEN_FINAL=$(grep '^AUTH_TOKEN=' "$INSTALL_DIR/server/.env" | cut -d= -f2-)
-REGISTER_TOKEN_FINAL=$(grep '^REGISTER_TOKEN=' "$INSTALL_DIR/server/.env" | cut -d= -f2-)
+# config.js puste: od tej wersji serwer NIE wydaje tokenu do przeglądarki -
+# dashboard loguje się hasłem (cookie), a serwer i tak serwuje /config.js dynamicznie.
+printf 'window.DHM_CONFIG = {};\n' > "$INSTALL_DIR/dashboard/dist/config.js"
+ok "Dashboard chroniony hasłem (DASHBOARD_PASSWORD w server/.env)"
+
+# --- Zmienne do podsumowania na końcu ---
 PORT_FINAL=$(grep '^PORT=' "$INSTALL_DIR/server/.env" | cut -d= -f2-)
-cat > "$INSTALL_DIR/dashboard/dist/config.js" <<EOF
-window.DHM_CONFIG = { token: "$AUTH_TOKEN_FINAL" };
-EOF
-ok "Wygenerowano config dashboard (token)"
+REGISTER_TOKEN_FINAL=$(grep '^REGISTER_TOKEN=' "$INSTALL_DIR/server/.env" | cut -d= -f2-)
+DASHBOARD_PASSWORD_FINAL=$(grep '^DASHBOARD_PASSWORD=' "$INSTALL_DIR/server/.env" | cut -d= -f2-)
 
 # --- Start ---
 # PORT/tokeny serwer czyta z server/.env - nie trzeba eksportować.
@@ -195,6 +204,9 @@ echo "  Telefon:  pkg install -y curl && curl -fsSL https://github.com/APOLL0PL/
 echo
 echo "REGISTER_TOKEN: $REGISTER_TOKEN_FINAL"
 echo "             (trzymaj w sekrecie - agenty potrzebują go tylko przy rejestracji)"
+echo
+echo "Hasło do dashboardu: $DASHBOARD_PASSWORD_FINAL"
+echo "             (logujesz się w przeglądarce przy pierwszym wejściu; zmienisz w server/.env)"
 echo
 echo "Usuwanie DHM:  scripts/uninstall-serwer.sh"
 echo
