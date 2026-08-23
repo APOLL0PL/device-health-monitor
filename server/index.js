@@ -55,6 +55,10 @@ if (process.env.CORS_DEV === '1') {
 }
 app.use(express.json({ limit: '10kb' }));
 
+// API nigdy nie jest cacheowane - 304 z pustym cialem wywala res.json()
+// po stronie klienta i "Brak urzadzen" mimo poprawnych danych
+app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+
 // --- sesje dashboardu ---
 const SESSION_TTL_MS = 12 * 3600 * 1000;
 const sessions = new Map(); // sid -> expires (ms)

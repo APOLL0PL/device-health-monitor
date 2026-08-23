@@ -13,7 +13,7 @@ const TOKEN = window.DHM_CONFIG?.token;
 let onUnauthorized = () => {};
 
 async function api(path) {
-  const res = await fetch(`${API}${path}`, credentials());
+  const res = await fetch(`${API}${path}`, { ...credentials(), cache: 'no-store' });
   if (res.status === 401) onUnauthorized();
   return res.json();
 }
@@ -115,13 +115,22 @@ export default function App() {
   }, []);
 
   const fetchData = useCallback(async () => {
-    const [devData, alertData] = await Promise.all([
+    // allSettled: awaria jednego endpointu nie moze czyscic calego widoku
+    const [devRes, alertRes] = await Promise.allSettled([
       api('/api/devices'),
       api('/api/alerts'),
     ]);
-    setDevices(devData.devices || []);
-    setSummary(devData.summary || { total: 0, online: 0, offline: 0, activeAlerts: 0 });
-    setAlerts(alertData.alerts || []);
+    if (devRes.status === 'fulfilled') {
+      setDevices(devRes.value.devices || []);
+      setSummary(devRes.value.summary || { total: 0, online: 0, offline: 0, activeAlerts: 0 });
+    } else {
+      console.warn('[dhm] /api/devices failed:', devRes.reason?.message);
+    }
+    if (alertRes.status === 'fulfilled') {
+      setAlerts(alertRes.value.alerts || []);
+    } else {
+      console.warn('[dhm] /api/alerts failed:', alertRes.reason?.message);
+    }
   }, []);
 
   const openDevice = useCallback((id) => {
