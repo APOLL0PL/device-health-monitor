@@ -129,7 +129,7 @@ function nvidiaSmiTemp() {
     let done = false;
     const finish = (v) => { if (!done) { done = true; resolve(v); } };
     try {
-      const c = spawn(exe, ['--query-gpu=temperature.gpu', '--format=csv,noheader,nounits'], { timeout: 5000 });
+      const c = spawn(exe, ['--query-gpu=temperature.gpu', '--format=csv,noheader,nounits'], { timeout: 5000, windowsHide: true });
       let out = '';
       c.stdout?.on('data', (d) => (out += d));
       c.on('error', () => finish(null));

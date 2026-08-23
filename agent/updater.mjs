@@ -101,7 +101,7 @@ export async function applyUpdate(release, log = console) {
     log.log(`[update] pobieram ${ASSET_NAME} (${release.tag_name})...`);
     const tarPath = await fetchAndVerifyTarball(release, tmp);
     // tarball ma pliki w korzeniu -> rozpakowujemy bezposrednio do tmp
-    await pexec('tar', ['-xzf', path.basename(tarPath)], { cwd: tmp });
+    await pexec('tar', ['-xzf', path.basename(tarPath)], { cwd: tmp, windowsHide: true });
 
     // sanity: tarball musi zawierac index.js
     if (!fs.existsSync(path.join(tmp, 'index.js'))) throw new Error('zly tarball (brak index.js)');
@@ -109,11 +109,11 @@ export async function applyUpdate(release, log = console) {
     copyTree(tmp, __dirname);
     log.log('[update] pliki podmienione, npm install...');
     await pexec(process.platform === 'win32' ? 'npm.cmd' : 'npm',
-      ['install', '--omit=dev', '--no-audit', '--no-fund'], { cwd: __dirname });
+      ['install', '--omit=dev', '--no-audit', '--no-fund'], { cwd: __dirname, windowsHide: true });
 
     log.log(`[update] restart pm2 (${PM2_APP})...`);
     const cmd = process.platform === 'win32' ? 'pm2.cmd' : 'pm2';
-    const child = spawn(cmd, ['restart', PM2_APP], { detached: true, stdio: 'ignore' });
+    const child = spawn(cmd, ['restart', PM2_APP], { detached: true, stdio: 'ignore', windowsHide: true });
     child.unref();
     setTimeout(() => process.exit(0), 2000);
     return true;
