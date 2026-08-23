@@ -50,10 +50,16 @@ echo Raporty:  co %REPORT_INTERVAL%s
 echo.
 
 rem ---- Node.js ----
+echo [2/8] Node.js...
 where node >nul 2>nul
 if %errorlevel% neq 0 (
     echo Brak Node.js. Instaluje Node.js LTS...
     winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements --silent
+    if %errorlevel% neq 0 (
+        echo ERROR: winget nie zadzialal - zainstaluj Node.js LTS recznie z https://nodejs.org
+        pause
+        exit /b 1
+    )
     echo.
     echo Zamknij to okno i uruchom skrypt ponownie - PATH zostal zaktualizowany.
     pause
@@ -62,17 +68,29 @@ if %errorlevel% neq 0 (
 echo [OK] Node.js
 
 rem ---- pm2 ----
+echo [3/8] pm2...
 where pm2 >nul 2>nul
 if %errorlevel% neq 0 (
     echo Instaluje pm2...
     call npm install -g pm2
 )
 set "PATH=%APPDATA%\npm;%PATH%"
+where pm2 >nul 2>nul
+if %errorlevel% neq 0 (
+    echo ERROR: pm2 nadal niedostepny po instalacji. Sprawdz recznie:
+    echo   npm install -g pm2
+    echo i uruchom ten skrypt ponownie.
+    pause
+    exit /b 1
+)
+echo [OK] pm2
 
 rem ---- zatrzymaj tylko agenta DHM (inne apki node/pm2 zostaja) ----
+echo [4/8] Zatrzymuje stara instancje (jesli byla)...
 pm2 delete dhm-agent >nul 2>nul
 
 rem ---- pobierz agenta (juz jest -> nie sciagaj) ----
+echo [5/8] Pliki agenta...
 if exist "%AGENT_DIR%\index.js" goto :have_agent
 rmdir /s /q "%AGENT_DIR%" >nul 2>nul
 mkdir "%AGENT_DIR%" >nul 2>nul
@@ -93,6 +111,7 @@ if not exist "%AGENT_DIR%\index.js" (
 echo [OK] Agent gotowy
 
 rem ---- zaleznosci ----
+echo [6/8] npm install...
 cd /d "%AGENT_DIR%"
 call npm install --omit=dev
 if %errorlevel% neq 0 (
@@ -102,13 +121,20 @@ if %errorlevel% neq 0 (
 )
 
 rem ---- rejestracja + start ----
+echo [7/8] Start pod pm2...
 del /q "%AGENT_DIR%\.api_key" >nul 2>nul
 set "REPORT_INTERVAL=%REPORT_INTERVAL%"
-pm2 start index.js --name dhm-agent --update-env
+call pm2 start index.js --name dhm-agent --update-env
+if %errorlevel% neq 0 (
+    echo ERROR: pm2 start nie powiodl sie - logi: pm2 logs dhm-agent
+    pause
+    exit /b 1
+)
 rem ---- zapisuje dhm-agent ORAZ inne apki juz zarzadzane przez pm2 ----
-pm2 save
+call pm2 save
 
 rem ---- autostart (dla wszystkich uzytkownikow jesli admin, inaczej obecny) ----
+echo [8/8] Autostart...
 net session >nul 2>nul
 if %errorlevel% equ 0 (
     set "STARTUP_DIR=%ProgramData%\Microsoft\Windows\Start Menu\Programs\Startup"
