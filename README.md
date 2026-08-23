@@ -134,6 +134,8 @@ Main dashboard with devices, alerts and offline panel:
 - **Update integrity** — release tarballs are published with `.sha256` checksums and verified by the agent auto-updater before install.
 - Tokens are **generated automatically** by `serwer.sh` (`server/.env`, gitignored).
 - CORS is off by default (enable only for dev with `CORS_DEV=1`), rate limiting, input validation, no `?token=` in URLs.
+- **Machine-to-machine reads** (ntfy bridge, Prometheus scraper): pass the X-Auth-Token header - accepted on all read endpoints and /metrics in secured mode (writes still require a browser session).
+- Sessions live in server memory - restarting the server requires signing in again (fine for LAN).
 - Traffic is plain **HTTP** — fine inside your LAN, but do not port-forward it; put a TLS reverse proxy (Caddy/nginx) in front if you need remote access.
 
 ## Requirements

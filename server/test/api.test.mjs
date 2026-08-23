@@ -217,6 +217,33 @@ test('unknown route returns JSON 404', async () => {
   assert.equal(body.error, 'Not found');
 });
 
+test('secured odczyt z X-Auth-Token (mostek ntfy / Prometheus), zapis juz nie', async () => {
+  for (const path of ['/api/devices', '/api/alerts', '/metrics']) {
+    const res = await fetch(`${BASE}${path}`, { headers: { 'X-Auth-Token': 'test-auth' } });
+    assert.equal(res.status, 200, `${path} przyjmuje X-Auth-Token bez cookie`);
+  }
+  const write = await fetch(`${BASE}/api/alerts/1/resolve`, {
+    method: 'POST',
+    headers: { 'X-Auth-Token': 'test-auth' },
+  });
+  assert.equal(write.status, 401, 'zapis w secured wymaga sesji, sam naglowek nie wystarczy');
+});
+
+test('device_uuid: odswieza type, grp tylko gdy agent go podal', async () => {
+  const uuid = crypto.randomUUID();
+  const r1 = await register('grp-dev', 'test-register', { device_uuid: uuid, ip: '10.0.0.60', type: 'laptop' });
+  const d1 = await r1.json();
+  await register('grp-dev', 'test-register', { device_uuid: uuid, ip: '10.0.0.61', type: 'desktop', group: 'biuro' });
+  let list = await (await get('/api/devices')).json();
+  let dev = list.devices.find((d) => d.id === d1.id);
+  assert.equal(dev.type, 'desktop', 'type odswiezany z rejestru');
+  assert.equal(dev.grp, 'biuro');
+  await register('grp-dev', 'test-register', { device_uuid: uuid, ip: '10.0.0.62' });
+  list = await (await get('/api/devices')).json();
+  dev = list.devices.find((d) => d.id === d1.id);
+  assert.equal(dev.grp, 'biuro', 'pusty DEVICE_GROUP agenta nie kasuje grupy');
+});
+
 test('register rate limit kicks in', async () => {
   let saw429 = false;
   for (let i = 0; i < 10; i++) {

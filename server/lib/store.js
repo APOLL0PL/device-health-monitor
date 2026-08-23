@@ -33,8 +33,10 @@ function registerDevice(name, ip, type = 'unknown', os_name = 'unknown', mac = n
     const byUuid = db.prepare('SELECT id, api_key, ip FROM devices WHERE device_uuid = ?').get(device_uuid);
     if (byUuid) {
       const newIp = isLoopback(ip) ? byUuid.ip : ip;
-      db.prepare('UPDATE devices SET ip = ?, os_name = ?, mac = COALESCE(?, mac) WHERE id = ?')
-        .run(newIp, os_name, mac, byUuid.id);
+      // grp aktualizowany tylko gdy agent faktycznie go podal (puste = nie ruszaj,
+      // bo grupy ustawiane na dashboardzie wygryaja z pustym DEVICE_GROUP agenta)
+      db.prepare('UPDATE devices SET ip = ?, os_name = ?, type = ?, mac = COALESCE(?, mac), grp = CASE WHEN ? != \'\' THEN ? ELSE grp END WHERE id = ?')
+        .run(newIp, os_name, type, mac, grp ?? '', grp ?? '', byUuid.id);
       return getDevice(byUuid.id);
     }
   }

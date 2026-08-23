@@ -94,9 +94,17 @@ const sessionSweeper = setInterval(() => {
 }, 3600_000);
 sessionSweeper.unref?.();
 
-function requireSession(req, res, next) {
-  if (!SECURED || validSession(req)) return next();
-  res.status(401).json({ error: 'Unauthorized - sign in via /api/login' });
+// Odczyt w trybie secured: sesja LUB X-Auth-Token (maszyny typu mostek
+// ntfy / Prometheus nie maja cookies - wystarczy im AUTH_TOKEN w naglowku).
+function hasValidToken(req) {
+  const t = req.headers['x-auth-token'];
+  return !!AUTH_TOKEN && typeof t === 'string' && t.length > 0
+    && sha256(t).equals(sha256(AUTH_TOKEN));
+}
+
+function requireRead(req, res, next) {
+  if (!SECURED || validSession(req) || hasValidToken(req)) return next();
+  res.status(401).json({ error: 'Unauthorized - sign in via /api/login or pass X-Auth-Token' });
 }
 
 // config.js dynamicznie. W trybie secured NIE wydajemy tokenu nikomu -
@@ -211,7 +219,7 @@ app.get('/api/session', (req, res) => {
 });
 
 // Dashboard endpoints (odczyt - w trybie secured wymagana sesja)
-app.get('/api/devices', requireSession, (req, res) => {
+app.get('/api/devices', requireRead, (req, res) => {
   const devices = getAllDevices().map((d) => {
     const device = publicDevice(d);
     const m = getLatestMetrics(device.id);
@@ -243,7 +251,7 @@ app.get('/api/devices', requireSession, (req, res) => {
   res.json({ devices, summary });
 });
 
-app.get('/api/devices/:id', requireSession, (req, res) => {
+app.get('/api/devices/:id', requireRead, (req, res) => {
   const row = getDevice(Number(req.params.id));
   if (!row) return res.status(404).json({ error: 'Not found' });
   const device = publicDevice(row);
@@ -260,18 +268,18 @@ app.patch('/api/devices/:id/thresholds', limiterWrite, authWrite, (req, res) => 
   res.json({ ok: true, thresholds: getThresholds(id) });
 });
 
-app.get('/api/devices/:id/metrics', requireSession, (req, res) => {
+app.get('/api/devices/:id/metrics', requireRead, (req, res) => {
   const raw = Number(req.query.hours);
   const hours = Number.isFinite(raw) ? Math.min(720, Math.max(1, raw)) : 24;
   const metrics = getMetrics(Number(req.params.id), hours);
   res.json({ metrics });
 });
 
-app.get('/api/alerts', requireSession, (req, res) => {
+app.get('/api/alerts', requireRead, (req, res) => {
   res.json({ alerts: getActiveAlerts() });
 });
 
-app.get('/api/summary', requireSession, (req, res) => {
+app.get('/api/summary', requireRead, (req, res) => {
   res.json(getDeviceSummary());
 });
 
@@ -281,7 +289,7 @@ app.get('/api/health', (req, res) => {
 
 // Setup info dla dashboardu: gotowe komendy instalacji agenta
 // (adres z Host naglowka; w trybie secured dostepne tylko po zalogowaniu)
-app.get('/api/setup', requireSession, (req, res) => {
+app.get('/api/setup', requireRead, (req, res) => {
   const host = req.headers.host || `localhost:${PORT}`;
   const proto = req.protocol === 'https' ? 'https' : 'http';
   const base = `${proto}://${host}`;
@@ -330,7 +338,7 @@ app.post('/api/alerts/:id/resolve', limiterWrite, authWrite, (req, res) => {
 });
 
 // Prometheus exposition format (odczyt - w trybie secured wymagana sesja)
-app.get('/metrics', requireSession, (req, res) => {
+app.get('/metrics', requireRead, (req, res) => {
   const rows = getAllDevices().map((d) => {
     const device = publicDevice(d);
     let disks = [];

@@ -130,6 +130,8 @@ Główny dashboard z urządzeniami, alertami i panelem offline:
 - **Integralność aktualizacji** — tarball-e release publikowane są z sumami `.sha256`, które auto-updater weryfikuje przed instalacją.
 - Tokeny **generują się automatycznie** w `serwer.sh` (`server/.env`, w `.gitignore`).
 - CORS domyślnie wyłączony (w dev włączaj świadomie: `CORS_DEV=1`), rate limiting, walidacja wejścia, brak `?token=` w URL.
+- **Odczyt maszynowy** (mostek ntfy, scraper Prometheus): naglowek X-Auth-Token - przyjmowany na odczycie i /metrics w trybie secured (zapis nadal wymaga sesji z przegladarki).
+- Sesje siedza w pamieci serwera - restart = ponowne logowanie (dla LAN OK).
 - Ruch idzie czystym **HTTP** — w LAN OK, ale nie rób port-forwardingu; zdalny dostęp tylko za reverse proxy z TLS (Caddy/nginx).
 
 ## Wymagania
