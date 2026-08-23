@@ -166,7 +166,7 @@ export default function App() {
     } catch {}
 
     return () => { clearInterval(poll); ws?.close(); };
-  }, [fetchData]);
+  }, [fetchData, auth]); // auth w deps: po zmianie 'checking'->'ok' efekt musi sie odpalic ponownie
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');

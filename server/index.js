@@ -59,6 +59,15 @@ app.use(express.json({ limit: '10kb' }));
 // po stronie klienta i "Brak urzadzen" mimo poprawnych danych
 app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
+// DHM_DEBUG=1: log kazdego zapytania /api (status + klient) - diagnostyka
+if (process.env.DHM_DEBUG === '1') {
+  app.use('/api', (req, res, next) => {
+    const ua = String(req.headers['user-agent'] || '').slice(0, 60);
+    res.on('finish', () => console.log(`[debug] ${req.method} ${req.url} -> ${res.statusCode} | ${ua}`));
+    next();
+  });
+}
+
 // --- sesje dashboardu ---
 const SESSION_TTL_MS = 12 * 3600 * 1000;
 const sessions = new Map(); // sid -> expires (ms)
