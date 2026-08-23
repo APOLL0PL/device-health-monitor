@@ -132,6 +132,7 @@ async function getMetrics() {
     disk_sys_used_gb: Math.round((mainDisk.used || 0) / 1024 / 1024 / 1024 * 10) / 10,
     disk_sys_total_gb: Math.round((mainDisk.size || 0) / 1024 / 1024 / 1024 * 10) / 10,
     temperature_c: temperature,
+    temperature_src: typeof temperature === 'number' ? 'cpu' : null,
     uptime_seconds: Math.floor(os.uptime()),
     net_in_bytes: net.rx,
     net_out_bytes: net.tx,

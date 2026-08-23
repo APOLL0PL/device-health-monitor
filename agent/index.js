@@ -107,15 +107,15 @@ async function getNetworkTotals() {
 
 async function getTemperature() {
   const temp = await si.cpuTemperature().catch(() => ({ main: null }));
-  if (Number.isFinite(temp.main) && temp.main > 0) return temp.main;
+  if (Number.isFinite(temp.main) && temp.main > 0) return { v: temp.main, src: 'cpu' };
   const nv = await nvidiaSmiTemp();
-  if (nv !== null) return nv;
+  if (nv !== null) return { v: nv, src: 'gpu' };
   const gfx = await si.graphics().catch(() => ({ controllers: [] }));
   const temps = (gfx.controllers || [])
     .map((c) => c.temperatureCore)
     .filter((t) => Number.isFinite(t) && t > 0);
-  if (temps.length) return Math.max(...temps);
-  return null;
+  if (temps.length) return { v: Math.max(...temps), src: 'gpu' };
+  return { v: null, src: null };
 }
 
 // GPU temp z nvidia-smi - dziala bez admina, ratuje maszyny gdzie ACPI
@@ -180,7 +180,8 @@ async function getMetrics() {
     disk_total_gb: Math.round(totalSize / 1024 / 1024 / 1024 * 10) / 10,
     disk_sys_used_gb: Math.round((mainDisk.used || 0) / 1024 / 1024 / 1024 * 10) / 10,
     disk_sys_total_gb: Math.round((mainDisk.size || 0) / 1024 / 1024 / 1024 * 10) / 10,
-    temperature_c: temperature,
+    temperature_c: temperature?.v ?? null,
+    temperature_src: temperature?.src ?? null,
     uptime_seconds: Math.floor(os.uptime()),
     net_in_bytes: net.rx,
     net_out_bytes: net.tx,
