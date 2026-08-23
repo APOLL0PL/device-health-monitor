@@ -119,6 +119,10 @@ export default function DeviceDetail({ deviceId, api }) {
 
   if (!device) return <div className="loading">{t('loading')}</div>;
 
+  // zrodlo ostatniego pomiaru decyduje o nazwie wykresu (CPU vs GPU)
+  const tempSrc = metrics.length ? metrics[metrics.length - 1].temperature_src : null;
+  const tempChartKey = tempSrc === 'gpu' ? 'chartTempGpu' : tempSrc === 'cpu' ? 'chartTempCpu' : 'chartTemperature';
+
   return (
     <div className="device-detail">
       <div className="detail-header">
@@ -162,7 +166,7 @@ export default function DeviceDetail({ deviceId, api }) {
           <ChartCard title="CPU %" data={metrics} dataKey="cpu_percent" color="#f97316" max={100} unit="%" />
           <ChartCard title="RAM %" data={metrics} dataKey="ram_pct" color="#3b82f6" max={100} unit="%" />
           <ChartCard title={t('chartDiskPct')} data={metrics} dataKey="disk_pct" color="#a855f7" max={100} unit="%" />
-          <ChartCard title={t('chartTemperature')} data={metrics} dataKey="temperature_c" color="#ef4444" unit="°C" />
+          <ChartCard title={t(tempChartKey)} data={metrics} dataKey="temperature_c" color="#ef4444" unit="°C" />
           <ChartCard title="RAM" data={metrics} dataKey="ram_used_mb" color="#3b82f6" unitMb />
           <ChartCard title={t('chartInternetDown')} data={metrics} dataKey="net_in_rate" color="#22c55e" rateBytes />
           <ChartCard title={t('chartInternetUp')} data={metrics} dataKey="net_out_rate" color="#eab308" rateBytes />
