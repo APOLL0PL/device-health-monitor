@@ -14,6 +14,7 @@ dhm-token.txt
 
 # Database
 server/data.db
+server/.self_uuid
 server/data.db-shm
 server/data.db-wal
 
