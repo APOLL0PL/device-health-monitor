@@ -49,6 +49,11 @@ export const STRINGS = {
     hintWindows: 'cmd jako Administrator',
     hintLinux: 'bash',
     hintTermux: 'apka Termux',
+    loginPrompt: 'Ten dashboard jest chroniony hasłem.',
+    phPassword: 'hasło',
+    signIn: 'Zaloguj',
+    loginFailed: 'Błędne hasło',
+    logout: 'Wyloguj',
   },
   en: {
     back: 'Back',
@@ -98,6 +103,11 @@ export const STRINGS = {
     hintWindows: 'cmd as Administrator',
     hintLinux: 'bash',
     hintTermux: 'Termux app',
+    loginPrompt: 'This dashboard is password protected.',
+    phPassword: 'password',
+    signIn: 'Sign in',
+    loginFailed: 'Wrong password',
+    logout: 'Log out',
   },
 };
 

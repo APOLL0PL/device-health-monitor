@@ -1,8 +1,11 @@
 // Auto-update DHM agenta z GitHub Releases.
 // Wyłącznik: DHM_AUTO_UPDATE=0. Repo: DHM_UPDATE_REPO (default APOLL0PL/device-health-monitor).
+// Integralność: tarball weryfikowany po sha256 z assetu <nazwa>.sha256
+// (awaryjne obejście, świadomie i na własne ryzyko: DHM_UPDATE_SKIP_HASH=1).
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -48,6 +51,33 @@ async function downloadAsset(assetUrl, destFile) {
   fs.writeFileSync(destFile, Buffer.from(await res.arrayBuffer()));
 }
 
+// Weryfikacja sha256 tarballa względem assetu <ASSET_NAME>.sha256 (format: "<hash>  <plik>").
+function verifySha256(tarFile, expectedHash) {
+  const actual = crypto.createHash('sha256').update(fs.readFileSync(tarFile)).digest('hex');
+  if (actual !== String(expectedHash).trim().toLowerCase()) {
+    throw new Error(`sha256 mismatch! oczekiwany ${expectedHash}, aktualny ${actual} - NIE instaluję.`);
+  }
+}
+
+async function fetchAndVerifyTarball(asset, destDir) {
+  const tarPath = path.join(destDir, ASSET_NAME);
+  await downloadAsset(asset.url, tarPath);
+
+  if (process.env.DHM_UPDATE_SKIP_HASH === '1') {
+    console.warn('[update] UWAGA: pomijam weryfikację sha256 (DHM_UPDATE_SKIP_HASH=1)');
+    return tarPath;
+  }
+
+  const hashAsset = (release.assets || []).find((a) => a.name === `${ASSET_NAME}.sha256`);
+  if (!hashAsset) throw new Error(`brak assetu ${ASSET_NAME}.sha256 - nie da się zweryfikować pobieranego kodu`);
+  const hashTmp = path.join(destDir, `${ASSET_NAME}.sha256`);
+  await downloadAsset(hashAsset.url, hashTmp);
+  // plik ma format "hash  nazwa" (jak wyjście sha256sum) - bierzemy pierwsze pole
+  const expected = fs.readFileSync(hashTmp, 'utf8').trim().split(/\s+/)[0];
+  verifySha256(tarPath, expected);
+  return tarPath;
+}
+
 const COPY_SKIP = new Set(['node_modules', '.api_key', '.update-tmp']);
 
 function copyTree(src, dest) {
@@ -69,9 +99,9 @@ export async function applyUpdate(release, log = console) {
   fs.mkdirSync(tmp, { recursive: true });
   try {
     log.log(`[update] pobieram ${ASSET_NAME} (${release.tag_name})...`);
-    await downloadAsset(asset.url, path.join(tmp, ASSET_NAME));
+    const tarPath = await fetchAndVerifyTarball(release, tmp);
     // tarball ma pliki w korzeniu -> rozpakowujemy bezposrednio do tmp
-    await pexec('tar', ['-xzf', ASSET_NAME], { cwd: tmp });
+    await pexec('tar', ['-xzf', path.basename(tarPath)], { cwd: tmp });
 
     // sanity: tarball musi zawierac index.js
     if (!fs.existsSync(path.join(tmp, 'index.js'))) throw new Error('zly tarball (brak index.js)');

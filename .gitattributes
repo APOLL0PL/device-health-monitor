@@ -1,0 +1,5 @@
+# Normalizacja koncow linii - LF wszedzie w repo (diff bez smieci),
+# wyjatek: skrypty cmd/bat tradycyjnie CRLF
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf

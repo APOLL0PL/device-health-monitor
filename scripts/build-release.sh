@@ -47,5 +47,11 @@ tar czf "$OUT_DIR/dhm-bundle.tar.gz" \
 [ "$(tar tzf "$OUT_DIR/dhm-bundle.tar.gz" | grep -c '\./dashboard/dist/index\.html')" -ge 1 ] \
     || { echo "ERROR: w dhm-bundle.tar.gz brak builda dashboard"; exit 1; }
 
+# --- sumy kontrolne (weryfikowane przez agent-updater i installery) ---
+cd "$OUT_DIR"
+for f in dhm-agent.tar.gz dhm-bundle.tar.gz; do
+    sha256sum "$f" > "$f.sha256"
+done
+
 ok "Zbudowano artefakty release w $OUT_DIR"
-ls -lh "$OUT_DIR"/*.tar.gz
+ls -lh "$OUT_DIR"/*.tar.gz "$OUT_DIR"/*.sha256

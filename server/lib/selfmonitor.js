@@ -1,9 +1,28 @@
 import os from 'node:os';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import si from 'systeminformation';
 import { getDevice, getLatestMetrics, publicDevice, recordMetrics, registerDevice } from './store.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const INTERVAL = Number(process.env.SELF_REPORT_INTERVAL) || 60_000;
 const DEVICE_NAME = process.env.SELF_DEVICE_NAME || os.hostname();
+const UUID_FILE = path.join(__dirname, '..', '.self_uuid');
+
+// Trwała tożsamość self-monitora (analogicznie do agenta) - zabezpiecza przed
+// duplikatami przy zmianie IP/MAC, np. po restarcie z wczesniej podniesionym wg0.
+function ensureSelfUuid() {
+  try {
+    const existing = fs.readFileSync(UUID_FILE, 'utf8').trim();
+    if (existing) return existing;
+  } catch {}
+  const uuid = crypto.randomUUID();
+  try { fs.writeFileSync(UUID_FILE, uuid); } catch {}
+  return uuid;
+}
 
 let selfDeviceId = null;
 
@@ -127,7 +146,7 @@ function ensureRegistered() {
   if (selfDeviceId) return;
   const ip = getLocalIp();
   if (ip === '127.0.0.1') return; // brak LAN IP (boot przed DHCP) - ponow w nastepnym cyklu
-  const dev = registerDevice(DEVICE_NAME, ip, 'server', os.platform(), getMac());
+  const dev = registerDevice(DEVICE_NAME, ip, 'server', os.platform(), getMac(), undefined, ensureSelfUuid());
   if (dev) selfDeviceId = dev.id;
 }
 

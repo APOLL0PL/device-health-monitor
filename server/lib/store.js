@@ -27,7 +27,19 @@ function isLoopback(ip) {
   return typeof ip === 'string' && (ip === '127.0.0.1' || ip.startsWith('127.'));
 }
 
-function registerDevice(name, ip, type = 'unknown', os_name = 'unknown', mac = null, grp = '') {
+function registerDevice(name, ip, type = 'unknown', os_name = 'unknown', mac = null, grp = '', device_uuid = null) {
+  // 1. UUID agenta - najmocniejsza tożsamość (trwała, generowana raz przez agenta)
+  if (device_uuid) {
+    const byUuid = db.prepare('SELECT id, api_key, ip FROM devices WHERE device_uuid = ?').get(device_uuid);
+    if (byUuid) {
+      const newIp = isLoopback(ip) ? byUuid.ip : ip;
+      // grp aktualizowany tylko gdy agent faktycznie go podal (puste = nie ruszaj,
+      // bo grupy ustawiane na dashboardzie wygryaja z pustym DEVICE_GROUP agenta)
+      db.prepare('UPDATE devices SET ip = ?, os_name = ?, type = ?, mac = COALESCE(?, mac), grp = CASE WHEN ? != \'\' THEN ? ELSE grp END WHERE id = ?')
+        .run(newIp, os_name, type, mac, grp ?? '', grp ?? '', byUuid.id);
+      return getDevice(byUuid.id);
+    }
+  }
   // Try MAC-based lookup first
   if (mac) {
     const existing = db.prepare('SELECT id, api_key, ip FROM devices WHERE mac = ?').get(mac);
@@ -55,8 +67,8 @@ function registerDevice(name, ip, type = 'unknown', os_name = 'unknown', mac = n
 
   const api_key = crypto.randomUUID();
   const result = db.prepare(
-    'INSERT INTO devices (name, ip, type, os_name, mac, api_key, grp) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(name, ip, type, os_name, mac, api_key, grp);
+    'INSERT INTO devices (name, ip, type, os_name, mac, api_key, grp, device_uuid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(name, ip, type, os_name, mac, api_key, grp, device_uuid);
 
   return { id: result.lastInsertRowid, api_key };
 }
@@ -67,7 +79,7 @@ function getAllDevices() {
 
 function publicDevice(d) {
   if (!d) return d;
-  const { api_key, ...device } = d;
+  const { api_key, device_uuid, ...device } = d;
   return device;
 }
 
@@ -286,6 +298,8 @@ function pruneOldMetrics() {
   if (now - lastPrune < 3_600_000) return;
   lastPrune = now;
   db.prepare("DELETE FROM metrics WHERE timestamp < datetime('now', '-30 days')").run();
+  // rotacja rozwiążanych alertów (aktywne zostają, zamknięte znikać po 30 dniach)
+  db.prepare("DELETE FROM alerts WHERE resolved_at IS NOT NULL AND resolved_at < datetime('now', '-30 days')").run();
 }
 
 function getDeviceSummary() {

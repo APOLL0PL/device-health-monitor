@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
@@ -41,19 +42,85 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
 const REGISTER_TOKEN = process.env.REGISTER_TOKEN || process.env.AUTH_TOKEN || '';
+// Haslo do dashboardu. Ustawione = odczyt i zapis wymagaja sesji (cookie HttpOnly).
+// Nieustawione = stary tryb otwarty (token przez /config.js) - z ostrzezeniem przy starcie.
+const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || '';
+const SECURED = DASHBOARD_PASSWORD.length > 0;
 const PKG = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 
 app.disable('x-powered-by');
-app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
+if (process.env.CORS_DEV === '1') {
+  // tylko dla dev (vite na 5173) - wlaczaj wprost: CORS_DEV=1
+  app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'], credentials: true }));
+}
 app.use(express.json({ limit: '10kb' }));
-// config.js dynamicznie (AUTH_TOKEN z .env) - npm run build kasuje plik z dist,
-// a tak dashboard dostaje token niezaleznie od builda
+
+// --- sesje dashboardu ---
+const SESSION_TTL_MS = 12 * 3600 * 1000;
+const sessions = new Map(); // sid -> expires (ms)
+const COOKIE_NAME = 'dhm_sid';
+
+function sha256(s) { return crypto.createHash('sha256').update(String(s)).digest(); }
+
+function parseCookies(req) {
+  const out = {};
+  const raw = req.headers.cookie;
+  if (!raw) return out;
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return out;
+}
+
+function createSession(res) {
+  const sid = crypto.randomBytes(32).toString('hex');
+  sessions.set(sid, Date.now() + SESSION_TTL_MS);
+  res.setHeader('Set-Cookie', `${COOKIE_NAME}=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}`);
+}
+
+function validSession(req) {
+  const sid = parseCookies(req)[COOKIE_NAME];
+  if (!sid) return false;
+  const exp = sessions.get(sid);
+  if (!exp || exp < Date.now()) { sessions.delete(sid); return false; }
+  sessions.set(sid, Date.now() + SESSION_TTL_MS); // przesuwanie okna aktywnosci
+  return true;
+}
+
+const sessionSweeper = setInterval(() => {
+  const now = Date.now();
+  for (const [sid, exp] of sessions) if (exp < now) sessions.delete(sid);
+}, 3600_000);
+sessionSweeper.unref?.();
+
+// Odczyt w trybie secured: sesja LUB X-Auth-Token (maszyny typu mostek
+// ntfy / Prometheus nie maja cookies - wystarczy im AUTH_TOKEN w naglowku).
+function hasValidToken(req) {
+  const t = req.headers['x-auth-token'];
+  return !!AUTH_TOKEN && typeof t === 'string' && t.length > 0
+    && sha256(t).equals(sha256(AUTH_TOKEN));
+}
+
+function requireRead(req, res, next) {
+  if (!SECURED || validSession(req) || hasValidToken(req)) return next();
+  res.status(401).json({ error: 'Unauthorized - sign in via /api/login or pass X-Auth-Token' });
+}
+
+// config.js dynamicznie. W trybie secured NIE wydajemy tokenu nikomu -
+// dashboard pracuje na sesji (cookie). Tryb otwarty zachowuje stary mechanizm.
 app.get('/config.js', (req, res) => {
-  res.type('application/javascript').send(`window.DHM_CONFIG = { token: ${JSON.stringify(AUTH_TOKEN)} };`);
+  res.type('application/javascript');
+  if (SECURED) {
+    res.send('window.DHM_CONFIG = {};');
+  } else {
+    res.send(`window.DHM_CONFIG = { token: ${JSON.stringify(AUTH_TOKEN)} };`);
+  }
 });
 app.use(express.static(path.join(__dirname, '../dashboard/dist')));
 
-const limiterRegister = rateLimit({ windowMs: 60_000, limit: 5 });
+const limiterRegister = rateLimit({ windowMs: 60_000, limit: Number(process.env.REGISTER_RATE_LIMIT) || 5 });
+const limiterLogin = rateLimit({ windowMs: 300_000, limit: Number(process.env.LOGIN_RATE_LIMIT) || 20 });
 const limiterWrite = rateLimit({ windowMs: 60_000, limit: 30 });
 const limiterReport = rateLimit({
   windowMs: 60_000,
@@ -69,19 +136,23 @@ const registerSchema = z.object({
   mac: z.string().max(32).optional().nullable(),
   group: z.string().trim().max(32).optional(),
   register_token: z.string().optional(),
+  device_uuid: z.string().trim().max(64).optional(),
 });
 
 const nameSchema = z.string().trim().min(1).max(64);
 const groupSchema = z.string().trim().max(32);
 
 function authWrite(req, res, next) {
+  // sesja (tryb secured) LUB naglowek X-Auth-Token (stary tryb otwarty)
+  if (!SECURED && AUTH_TOKEN && req.headers['x-auth-token'] === AUTH_TOKEN) return next();
   if (!AUTH_TOKEN) {
-    return res.status(503).json({ error: 'AUTH_TOKEN not configured — set it in server/.env' });
+    return res.status(503).json({ error: 'AUTH_TOKEN not configured - set it in server/.env' });
   }
-  if (req.headers['x-auth-token'] !== AUTH_TOKEN) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  if (SECURED) {
+    if (validSession(req)) return next();
+    return res.status(401).json({ error: 'Unauthorized - sign in via /api/login' });
   }
-  next();
+  return res.status(401).json({ error: 'Unauthorized' });
 }
 
 function authenticateAgent(req, res, next) {
@@ -108,7 +179,8 @@ app.post('/api/agent/register', limiterRegister, (req, res) => {
     body.type,
     body.os_name,
     body.mac || null,
-    body.group || ''
+    body.group || '',
+    body.device_uuid || null
   );
   if (!device) {
     return res.status(409).json({ error: 'No reliable identity (IP loopback without MAC)' });
@@ -125,8 +197,29 @@ app.post('/api/agent/report', limiterReport, authenticateAgent, (req, res) => {
   res.json({ ok: true });
 });
 
-// Dashboard endpoints (read-only, open dashboard)
-app.get('/api/devices', (req, res) => {
+// --- logowanie dashboardu (tryb secured: DASHBOARD_PASSWORD ustawione) ---
+app.post('/api/login', limiterLogin, (req, res) => {
+  if (!SECURED) return res.status(400).json({ error: 'Dashboard not secured - set DASHBOARD_PASSWORD in server/.env' });
+  const pass = typeof req.body?.password === 'string' ? req.body.password : '';
+  const ok = pass.length > 0 && sha256(pass).equals(sha256(DASHBOARD_PASSWORD));
+  if (!ok) return res.status(401).json({ error: 'Invalid password' });
+  createSession(res);
+  res.json({ ok: true });
+});
+
+app.post('/api/logout', (req, res) => {
+  const sid = parseCookies(req)[COOKIE_NAME];
+  if (sid) sessions.delete(sid);
+  res.setHeader('Set-Cookie', `${COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`);
+  res.json({ ok: true });
+});
+
+app.get('/api/session', (req, res) => {
+  res.json({ secured: SECURED, authenticated: !SECURED || validSession(req) });
+});
+
+// Dashboard endpoints (odczyt - w trybie secured wymagana sesja)
+app.get('/api/devices', requireRead, (req, res) => {
   const devices = getAllDevices().map((d) => {
     const device = publicDevice(d);
     const m = getLatestMetrics(device.id);
@@ -158,7 +251,7 @@ app.get('/api/devices', (req, res) => {
   res.json({ devices, summary });
 });
 
-app.get('/api/devices/:id', (req, res) => {
+app.get('/api/devices/:id', requireRead, (req, res) => {
   const row = getDevice(Number(req.params.id));
   if (!row) return res.status(404).json({ error: 'Not found' });
   const device = publicDevice(row);
@@ -175,18 +268,18 @@ app.patch('/api/devices/:id/thresholds', limiterWrite, authWrite, (req, res) => 
   res.json({ ok: true, thresholds: getThresholds(id) });
 });
 
-app.get('/api/devices/:id/metrics', (req, res) => {
+app.get('/api/devices/:id/metrics', requireRead, (req, res) => {
   const raw = Number(req.query.hours);
   const hours = Number.isFinite(raw) ? Math.min(720, Math.max(1, raw)) : 24;
   const metrics = getMetrics(Number(req.params.id), hours);
   res.json({ metrics });
 });
 
-app.get('/api/alerts', (req, res) => {
+app.get('/api/alerts', requireRead, (req, res) => {
   res.json({ alerts: getActiveAlerts() });
 });
 
-app.get('/api/summary', (req, res) => {
+app.get('/api/summary', requireRead, (req, res) => {
   res.json(getDeviceSummary());
 });
 
@@ -195,8 +288,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // Setup info dla dashboardu: gotowe komendy instalacji agenta
-// (adres z Host nagłówka - dashboard i tak jest otwarty w LAN)
-app.get('/api/setup', (req, res) => {
+// (adres z Host naglowka; w trybie secured dostepne tylko po zalogowaniu)
+app.get('/api/setup', requireRead, (req, res) => {
   const host = req.headers.host || `localhost:${PORT}`;
   const proto = req.protocol === 'https' ? 'https' : 'http';
   const base = `${proto}://${host}`;
@@ -244,8 +337,8 @@ app.post('/api/alerts/:id/resolve', limiterWrite, authWrite, (req, res) => {
   res.json({ ok: true });
 });
 
-// Prometheus exposition format (LAN only, read-only)
-app.get('/metrics', (req, res) => {
+// Prometheus exposition format (odczyt - w trybie secured wymagana sesja)
+app.get('/metrics', requireRead, (req, res) => {
   const rows = getAllDevices().map((d) => {
     const device = publicDevice(d);
     let disks = [];
@@ -300,12 +393,19 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: 'invalid payload', details: err.issues });
   }
   console.error(`[error] ${req.method} ${req.originalUrl}:`, err.message || err);
-  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+  res.status(err.status || 500).json({ error: 'Internal Server Error' });
 });
 
 // HTTP + WebSocket
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({
+  server,
+  // tryb secured: handshake wymaga waznej sesji (cookie idzie automatycznie same-origin)
+  verifyClient: (info, done) => {
+    if (!SECURED) return done(true);
+    done(validSession({ headers: info.req.headers }));
+  },
+});
 
 const clients = new Set();
 
@@ -332,11 +432,18 @@ const selfTimer = selfmonitorStart(broadcast);
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Device Health Monitor server on http://0.0.0.0:${PORT}`);
+  if (SECURED) {
+    console.log('Dashboard: logowanie haslem (DASHBOARD_PASSWORD) - odczyt i zapis wymagaja sesji.');
+  } else {
+    console.warn('UWAGA: dashboard OTWARTY (bez loginu). Ustaw DASHBOARD_PASSWORD w server/.env,');
+    console.warn('       zeby chronic podglad sieci i operacje zapisu.');
+  }
 });
 
 function shutdown() {
   clearInterval(summaryTimer);
   clearInterval(selfTimer);
+  clearInterval(sessionSweeper);
   server.close();
 }
 

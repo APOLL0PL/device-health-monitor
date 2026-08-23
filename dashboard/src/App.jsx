@@ -9,13 +9,23 @@ import { LangProvider, makeT } from './i18n.jsx';
 const API = '';
 const TOKEN = window.DHM_CONFIG?.token;
 
+// 401 z dowolnego zapytania -> ekran logowania (ustawiane w App przez effect)
+let onUnauthorized = () => {};
+
 async function api(path) {
-  const res = await fetch(`${API}${path}`);
+  const res = await fetch(`${API}${path}`, credentials());
+  if (res.status === 401) onUnauthorized();
   return res.json();
+}
+
+function credentials() {
+  // cookies jada same-origin domyślnie; jawne dla czytelności
+  return { credentials: 'same-origin' };
 }
 
 async function apiWrite(path, method, body) {
   const res = await fetch(`${API}${path}`, {
+    ...credentials(),
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -23,7 +33,53 @@ async function apiWrite(path, method, body) {
     },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (res.status === 401) onUnauthorized();
   return res.json();
+}
+
+function LoginScreen({ lang, onSuccess }) {
+  const [pass, setPass] = useState('');
+  const [error, setError] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const t = makeT(lang);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(false);
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pass }),
+      });
+      if (res.ok) return onSuccess();
+      setError(true);
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="login-wrap">
+      <form className="login-card" onSubmit={submit}>
+        <h1><MonitorDot size={22} strokeWidth={1.5} /> Device Health Monitor</h1>
+        <p>{t('loginPrompt')}</p>
+        <input
+          type="password"
+          value={pass}
+          onChange={(e) => setPass(e.target.value)}
+          placeholder={t('phPassword')}
+          autoFocus
+          disabled={busy}
+        />
+        {error && <div className="login-error">{t('loginFailed')}</div>}
+        <button type="submit" disabled={busy || !pass}>{t('signIn')}</button>
+      </form>
+    </div>
+  );
 }
 
 const parseHash = () => {
@@ -41,7 +97,22 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [groupFilter, setGroupFilter] = useState('');
   const [lang, setLang] = useState(() => localStorage.getItem('lang') || 'pl');
+  // auth: 'checking' | 'login' (wymagane zalogowanie) | 'ok'
+  const [auth, setAuth] = useState('checking');
+  const [secured, setSecured] = useState(false);
   const t = makeT(lang);
+
+  useEffect(() => {
+    onUnauthorized = () => setAuth((a) => (a === 'ok' ? 'login' : a));
+    fetch('/api/session')
+      .then((r) => r.json())
+      .then((s) => {
+        setSecured(!!s.secured);
+        setAuth(s.secured && !s.authenticated ? 'login' : 'ok');
+      })
+      .catch(() => setAuth('ok'));
+    return () => { onUnauthorized = () => {}; };
+  }, []);
 
   const fetchData = useCallback(async () => {
     const [devData, alertData] = await Promise.all([
@@ -67,6 +138,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (auth !== 'ok') return undefined; // bez pollingu, dopóki niezalogowani
     fetchData();
     const poll = setInterval(fetchData, 5000);
 
@@ -121,6 +193,19 @@ export default function App() {
 
   const toggleLang = () => setLang(l => (l === 'pl' ? 'en' : 'pl'));
 
+  const logout = async () => {
+    try { await fetch('/api/logout', { method: 'POST' }); } catch {}
+    window.location.reload();
+  };
+
+  if (auth === 'checking') {
+    return <div className="app"><div className="empty-state"><p>{t('loading')}</p></div></div>;
+  }
+
+  if (auth === 'login') {
+    return <LoginScreen lang={lang} onSuccess={() => window.location.reload()} />;
+  }
+
   if (selected) {
     return (
       <LangProvider lang={lang}>
@@ -132,6 +217,9 @@ export default function App() {
             <h1>Device Health Monitor</h1>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-theme btn-lang" onClick={toggleLang}>{lang === 'pl' ? 'EN' : 'PL'}</button>
+              {secured && (
+                <button className="btn-theme" title={t('logout')} onClick={logout}>{t('logout')}</button>
+              )}
               <button className="btn-theme" onClick={() => setDark(!dark)}>
                 {dark ? <Sun size={18} /> : <Moon size={18} />}
               </button>
@@ -175,6 +263,9 @@ export default function App() {
               {units === 'pct' ? <Percent size={16} /> : <HardDrive size={16} />}
             </button>
             <button className="btn-theme btn-lang" onClick={toggleLang}>{lang === 'pl' ? 'EN' : 'PL'}</button>
+            {secured && (
+              <button className="btn-theme" title={t('logout')} onClick={logout}>{t('logout')}</button>
+            )}
             <button className="btn-theme" onClick={() => setDark(!dark)}>
               {dark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
