@@ -11,6 +11,9 @@ const THRESHOLDS = {
 };
 
 function num(v, def = null) {
+  // Number(null)=0, wiec jawne null/undefined musza isc prosto do defa,
+  // inaczej "brak pomiaru" (np. temperatura) zapisuje sie jako falszywe zero
+  if (v === null || v === undefined) return def;
   const n = Number(v);
   return Number.isFinite(n) ? n : def;
 }
