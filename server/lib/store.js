@@ -117,12 +117,22 @@ function recordMetrics(deviceId, metrics) {
     if (clean.length) disksJson = JSON.stringify(clean);
   }
 
+  // temperatura: null = brak pomiaru (nigdy nie zamieniac na 0); zrodlo tylko
+  // gdy pomiar jest wazny i pochodzi ze znanego sensora
+  const tVal = (() => {
+    const t = num(metrics.temperature_c);
+    return t !== null && t > -50 && t < 200 ? t : null;
+  })();
+  const tSrc = tVal !== null && (metrics.temperature_src === 'gpu' || metrics.temperature_src === 'cpu')
+    ? metrics.temperature_src
+    : null;
+
   const stmt = db.prepare(`
     INSERT INTO metrics (device_id, cpu_percent, ram_used_mb, ram_total_mb, ram_cache_mb,
       disk_used_gb, disk_total_gb, disk_sys_used_gb, disk_sys_total_gb,
-      temperature_c, uptime_seconds,
+      temperature_c, temperature_src, uptime_seconds,
       net_in_bytes, net_out_bytes, disks_json, battery_percent, battery_charging)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -135,10 +145,8 @@ function recordMetrics(deviceId, metrics) {
     clamp(metrics.disk_total_gb, 0, 1e9, 0),
     clamp(metrics.disk_sys_used_gb, 0, 1e9, null) ?? clamp(metrics.disk_used_gb, 0, 1e9, 0),
     clamp(metrics.disk_sys_total_gb, 0, 1e9, null) ?? clamp(metrics.disk_total_gb, 0, 1e9, 0),
-    (() => {
-      const t = num(metrics.temperature_c);
-      return t !== null && t > -50 && t < 200 ? t : null;
-    })(),
+    tVal,
+    tSrc,
     Math.floor(clamp(metrics.uptime_seconds, 0, 1e12, 0)),
     clamp(metrics.net_in_bytes, 0, 1e18, 0),
     clamp(metrics.net_out_bytes, 0, 1e18, 0),

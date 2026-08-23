@@ -34,6 +34,7 @@ db.exec(`
     disk_sys_used_gb REAL,
     disk_sys_total_gb REAL,
     temperature_c REAL,
+    temperature_src TEXT,
     uptime_seconds INTEGER,
     net_in_bytes INTEGER,
     net_out_bytes INTEGER,
@@ -73,6 +74,7 @@ try { db.exec("ALTER TABLE metrics ADD COLUMN disk_sys_total_gb REAL DEFAULT 0")
 try { db.exec("ALTER TABLE metrics ADD COLUMN disks_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE metrics ADD COLUMN battery_percent REAL"); } catch {}
 try { db.exec("ALTER TABLE metrics ADD COLUMN battery_charging INTEGER"); } catch {}
+try { db.exec("ALTER TABLE metrics ADD COLUMN temperature_src TEXT"); } catch {}
 try { db.exec("ALTER TABLE devices ADD COLUMN grp TEXT DEFAULT ''"); } catch {}
 db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_mac ON devices(mac) WHERE mac IS NOT NULL");
 try { db.exec("ALTER TABLE devices ADD COLUMN device_uuid TEXT"); } catch {}
