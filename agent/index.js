@@ -1,6 +1,7 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import si from 'systeminformation';
 
@@ -15,6 +16,20 @@ const DEVICE_GROUP = process.env.DEVICE_GROUP || '';
 const REGISTER_TOKEN = process.env.REGISTER_TOKEN || '';
 
 const KEY_FILE = path.join(__dirname, '.api_key');
+const UUID_FILE = path.join(__dirname, '.device_uuid');
+
+// Trwała tożsamość urządzenia: generowana raz, przetrwa zmiany IP/MAC/reinstalacje
+// katalogu agenta (plik trzymany obok .api_key). Serwer rozpoznaje po niej urządzenie.
+function ensureDeviceUuid() {
+  try {
+    const existing = fs.readFileSync(UUID_FILE, 'utf8').trim();
+    if (existing) return existing;
+  } catch {}
+  const uuid = crypto.randomUUID();
+  fs.writeFileSync(UUID_FILE, uuid);
+  return uuid;
+}
+const DEVICE_UUID = ensureDeviceUuid();
 
 import { startAutoUpdate } from './updater.mjs';
 startAutoUpdate();
@@ -160,6 +175,7 @@ async function register(apiKey) {
       mac,
       group: DEVICE_GROUP,
       register_token: REGISTER_TOKEN,
+      device_uuid: DEVICE_UUID,
     }),
   });
   const data = await res.json();
