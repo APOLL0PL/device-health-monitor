@@ -2,7 +2,7 @@
 // E2E smoke DHM: stawia prawdziwy serwer na losowym porcie (tryb otwarty),
 // przechodzi pelna sciezke: health -> rejestracja agenta -> raporty ->
 // dashboard API -> alerty -> progi -> WS broadcast -> statyki.
-// Uruchomienie:  node scripts/e2e-smoke.mjs
+// Uruchomienie z katalogu server/:  npm run e2e
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -13,7 +13,8 @@ import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SERVER_DIR = path.join(__dirname, '..', 'server');
+// plik siedzi w server/test/ -> korzen serwera to jeden poziom wyzej
+const SERVER_DIR = path.join(__dirname, '..');
 const AUTH_TOKEN = crypto.randomBytes(12).toString('hex');
 const REGISTER_TOKEN = crypto.randomBytes(12).toString('hex');
 const UUID = crypto.randomUUID();
@@ -135,11 +136,12 @@ try {
     const ws = new WebSocket(`ws://127.0.0.1:${port}`);
     ws.on('message', (d) => {
       const m = JSON.parse(d.toString());
-      if (m.type === 'metrics') { resolve(m); ws.close(); }
+      // filtr deviceId: self-monitor tez nadaje metrics (cpu realne, nie 44)
+      if (m.type === 'metrics' && m.deviceId === dev.id) { resolve(m); ws.close(); }
     });
     ws.on('error', reject);
-    setTimeout(() => { ws.close(); reject(new Error('brak broadcastu WS')); }, 10000);
-    report(base, dev.api_key, { cpu_percent: 44 }).catch(reject);
+    setTimeout(() => { try { ws.close(); } catch {} reject(new Error('brak broadcastu WS')); }, 10000);
+    ws.on('open', () => report(base, dev.api_key, { cpu_percent: 44 }).catch(reject)); // dopiero po open - inaczej wyscig
   });
   ok(wsMsg.metrics.cpu_percent === 44, 'WS broadcast metrics dochodzi live');
 } catch (e) {
