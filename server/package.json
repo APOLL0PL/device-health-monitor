@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "e2e": "node test/e2e-smoke.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",
@@ -16,5 +17,8 @@
     "systeminformation": "^5.21.0",
     "ws": "^8.21.3",
     "zod": "^4.4.3"
+  },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true
   }
 }
