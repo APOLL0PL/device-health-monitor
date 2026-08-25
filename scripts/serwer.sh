@@ -171,9 +171,14 @@ DASHBOARD_PASSWORD_FINAL=$(grep '^DASHBOARD_PASSWORD=' "$INSTALL_DIR/server/.env
 # --- Start ---
 # PORT/tokeny serwer czyta z server/.env - nie trzeba eksportować.
 cd "$INSTALL_DIR/server"
-pm2 start index.js --name "$PM2_NAME"
+if pm2 describe "$PM2_NAME" >/dev/null 2>&1; then
+    pm2 restart "$PM2_NAME"
+    ok "Serwer zrestartowany - proces pm2 '$PM2_NAME' już istniał (bez duplikatu)."
+else
+    pm2 start index.js --name "$PM2_NAME"
+    ok "Serwer wystartował (pm2 name: $PM2_NAME)."
+fi
 pm2 save
-ok "Serwer wystartował (pm2 name: $PM2_NAME)."
 
 # --- Firewall ---
 if command -v ufw >/dev/null 2>&1; then
