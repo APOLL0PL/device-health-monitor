@@ -165,6 +165,7 @@ ok "Dashboard chroniony hasłem (DASHBOARD_PASSWORD w server/.env)"
 
 # --- Zmienne do podsumowania na końcu ---
 PORT_FINAL=$(grep '^PORT=' "$INSTALL_DIR/server/.env" | cut -d= -f2-)
+PORT_FINAL="${PORT_FINAL:-$PORT}"
 REGISTER_TOKEN_FINAL=$(grep '^REGISTER_TOKEN=' "$INSTALL_DIR/server/.env" | cut -d= -f2-)
 DASHBOARD_PASSWORD_FINAL=$(grep '^DASHBOARD_PASSWORD=' "$INSTALL_DIR/server/.env" | cut -d= -f2-)
 
@@ -179,6 +180,22 @@ else
     ok "Serwer wystartował (pm2 name: $PM2_NAME)."
 fi
 pm2 save
+
+# --- Health-check: nie deklaruj sukcesu, zanim serwer realnie odpowie ---
+ok "Czekam aż serwer odpowie (http://127.0.0.1:$PORT_FINAL/api/health)..."
+HEALTH_OK=0
+for _ in $(seq 1 15); do
+    if curl -fsS -m 2 "http://127.0.0.1:$PORT_FINAL/api/health" >/dev/null 2>&1; then
+        HEALTH_OK=1
+        break
+    fi
+    sleep 2
+done
+if [ "$HEALTH_OK" = "1" ]; then
+    ok "Serwer odpowiada (port $PORT_FINAL)"
+else
+    fail "Serwer NIE odpowiada po ~30 s. Diagnoza: pm2 logs $PM2_NAME --err --lines 30"
+fi
 
 # --- Firewall ---
 if command -v ufw >/dev/null 2>&1; then
