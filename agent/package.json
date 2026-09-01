@@ -7,6 +7,6 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "systeminformation": "^5.33.1"
+    "systeminformation": "^5.33.6"
   }
 }
