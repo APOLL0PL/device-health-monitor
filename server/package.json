@@ -13,7 +13,7 @@
     "better-sqlite3": "^11.0.0",
     "cors": "^2.8.5",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.6.2",
+    "express-rate-limit": "^8.7.0",
     "systeminformation": "^5.21.0",
     "ws": "^8.21.3",
     "zod": "^4.4.3"
